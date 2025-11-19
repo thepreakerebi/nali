@@ -172,8 +172,7 @@ export default function Home() {
   // This prevents the flash of home page content
   if (userProfile === undefined) {
     return (
-      <main className="h-full w-full overflow-auto">
-        <section className="flex flex-col w-full gap-4">
+      <section className="flex flex-col w-full gap-4">
           {/* Stats Cards Section Skeleton */}
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -213,7 +212,6 @@ export default function Home() {
             </section>
           </section>
         </section>
-      </main>
     );
   }
 
@@ -267,8 +265,7 @@ export default function Home() {
         subjectId={selectedSubject?._id || null}
         subjectName={selectedSubject?.name || null}
       />
-      <main className="h-full w-full overflow-auto">
-        <section className="flex flex-col w-full gap-4">
+      <section className="flex flex-col w-full gap-4">
         {/* Stats Cards Section */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -411,7 +408,6 @@ export default function Home() {
           </Tabs>
         </section>
       </section>
-    </main>
     </section>
   );
 }
