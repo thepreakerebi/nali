@@ -49,7 +49,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             preferredLanguage: "en", // Default to English
             onboardingCompleted: false, // Will be set to true when schoolName and country are provided
           });
-          console.log("Created user profile with profilePhoto:", profilePhoto ? "yes" : "no");
+          console.log("Created user profile:", {
+            profilePhoto: profilePhoto ? `Set to: ${profilePhoto.substring(0, 50)}...` : "Not provided",
+            hasProfilePhoto: !!profilePhoto,
+          });
         } catch (error) {
           console.error("Error creating user profile in callback:", error);
           // Don't throw - allow sign-in to continue even if profile creation fails
@@ -70,13 +73,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (email && email !== existingProfile.email) {
           updates.email = email;
         }
-        // Always update profilePhoto if provided from Google
-        // This ensures existing users get their profile photo set
+        // ALWAYS update profilePhoto if provided from Google, even if it already exists
+        // This ensures the profile photo is always up to date
         if (profilePhoto) {
-          // Update if different or if existing doesn't have one
-          if (profilePhoto !== existingProfile.profilePhoto) {
-            updates.profilePhoto = profilePhoto;
-          }
+          updates.profilePhoto = profilePhoto;
         }
         if (googleId && googleId !== existingProfile.googleId) {
           updates.googleId = googleId;
@@ -85,10 +85,15 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (Object.keys(updates).length > 0) {
           try {
             await ctx.db.patch(existingProfile._id, updates);
-            console.log("Updated user profile with profilePhoto:", updates.profilePhoto ? "yes" : "no");
+            console.log("Updated user profile:", {
+              profilePhoto: updates.profilePhoto ? `Set to: ${updates.profilePhoto.substring(0, 50)}...` : "Not updated",
+              hasProfilePhoto: !!updates.profilePhoto,
+            });
           } catch (error) {
             console.error("Error updating user profile in callback:", error);
           }
+        } else {
+          console.log("No updates needed for user profile");
         }
       }
     },

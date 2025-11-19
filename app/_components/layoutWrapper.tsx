@@ -15,7 +15,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full">
+    <section className="flex h-screen w-full">
       <AppSidebar />
       <SidebarInset className="flex-1 overflow-auto">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -23,7 +23,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         </header>
         <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
-    </div>
+    </section>
   );
 }
 

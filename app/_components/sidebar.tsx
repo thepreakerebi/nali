@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
+import * as React from "react";
 import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -60,16 +61,16 @@ function LessonPlanItem({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div
+    <article
       className="group relative flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent transition-colors"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <span className="flex-1 truncate text-sm text-sidebar-foreground">
+      <p className="flex-1 truncate text-sm text-sidebar-foreground">
         {plan.title}
-      </span>
+      </p>
       {isHovered && (
-        <div className="flex items-center gap-1">
+        <nav className="flex items-center gap-1" aria-label="Lesson plan actions">
           <Button
             variant="ghost"
             size="icon"
@@ -88,9 +89,9 @@ function LessonPlanItem({
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </Button>
-        </div>
+        </nav>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -107,14 +108,14 @@ function LessonNoteItem({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div
+    <article
       className="group relative flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent transition-colors"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <span className="flex-1 truncate text-sm text-sidebar-foreground">
+      <p className="flex-1 truncate text-sm text-sidebar-foreground">
         {note.title}
-      </span>
+      </p>
       {isHovered && (
         <Button
           variant="ghost"
@@ -126,7 +127,7 @@ function LessonNoteItem({
           <TrashIcon className="h-3.5 w-3.5" />
         </Button>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -135,6 +136,22 @@ function UserDropdown() {
   const router = useRouter();
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   const { state } = useSidebar();
+
+  // Get profile photo URL, ensuring it's a valid string or undefined
+  const profilePhotoUrl = userProfile?.profilePhoto?.trim() || undefined;
+
+  // Debug: Log profilePhoto value when it changes
+  React.useEffect(() => {
+    if (userProfile && typeof window !== "undefined") {
+      console.log("UserProfile data:", {
+        hasProfilePhoto: !!userProfile.profilePhoto,
+        profilePhoto: userProfile.profilePhoto,
+        profilePhotoType: typeof userProfile.profilePhoto,
+        profilePhotoLength: userProfile.profilePhoto?.length,
+        profilePhotoUrl,
+      });
+    }
+  }, [userProfile, profilePhotoUrl]);
 
 
   const getInitials = (name?: string) => {
@@ -166,10 +183,10 @@ function UserDropdown() {
         <Skeleton className="size-8 shrink-0 rounded-full" />
         {state === "expanded" && (
           <>
-            <div className="flex flex-col gap-1 items-start flex-1 min-w-0">
+            <section className="flex flex-col gap-1 items-start flex-1 min-w-0">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />
-            </div>
+            </section>
             <Skeleton className="size-4 shrink-0 rounded" />
           </>
         )}
@@ -196,23 +213,47 @@ function UserDropdown() {
           }
         >
           <Avatar className="size-8 shrink-0">
-            <AvatarImage src={userProfile.profilePhoto || undefined} alt={userProfile.name} />
+            <AvatarImage 
+              src={profilePhotoUrl} 
+              alt={`${userProfile.name}'s profile photo`}
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                console.error("Failed to load profile photo:", {
+                  url: profilePhotoUrl,
+                  error: e,
+                  target: e.currentTarget,
+                  src: e.currentTarget.src,
+                  naturalWidth: e.currentTarget.naturalWidth,
+                  naturalHeight: e.currentTarget.naturalHeight,
+                  complete: e.currentTarget.complete,
+                });
+              }}
+              onLoad={(e) => {
+                console.log("Profile photo loaded successfully:", {
+                  url: profilePhotoUrl,
+                  naturalWidth: e.currentTarget.naturalWidth,
+                  naturalHeight: e.currentTarget.naturalHeight,
+                  src: e.currentTarget.src,
+                  complete: e.currentTarget.complete,
+                });
+              }}
+            />
             <AvatarFallback className="text-xs">
               {getInitials(userProfile.name)}
             </AvatarFallback>
           </Avatar>
           {state === "expanded" && (
             <>
-              <div className="flex flex-col gap-1 items-start flex-1 min-w-0">
-                <span className="text-sm font-medium truncate w-full">
+              <section className="flex flex-col gap-1 items-start flex-1 min-w-0">
+                <p className="text-sm font-medium truncate w-full">
                   {userProfile.name}
-                </span>
+                </p>
                 {userProfile.schoolName && (
-                  <span className="text-xs text-muted-foreground truncate w-full">
+                  <p className="text-xs text-muted-foreground truncate w-full">
                     {userProfile.schoolName}
-                  </span>
+                  </p>
                 )}
-              </div>
+              </section>
               <ChevronRightIcon className="size-4 shrink-0" />
             </>
           )}
@@ -221,16 +262,16 @@ function UserDropdown() {
       <DropdownMenuContent side="right" align="end" className="w-48">
         <DropdownMenuItem>
           <SettingsIcon className="size-4" />
-          <span>Settings</span>
+          Settings
         </DropdownMenuItem>
         <DropdownMenuItem>
           <HelpCircleIcon className="size-4" />
-          <span>Help</span>
+          Help
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOutIcon className="size-4" />
-          <span>Log Out</span>
+          Log Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -309,7 +350,7 @@ function AppSidebarContent() {
   return (
     <>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
+        <header className="flex items-center gap-2">
           <Image
             src="/nali-logo.svg"
             alt="Nali Logo"
@@ -317,7 +358,7 @@ function AppSidebarContent() {
             height={33}
             className="h-6 w-auto"
           />
-        </div>
+        </header>
       </SidebarHeader>
 
       <SidebarContent className="px-4 gap-4">
@@ -332,7 +373,7 @@ function AppSidebarContent() {
                   onClick={() => router.push("/")}
                 >
                   <HomeIcon className="size-4" />
-                  <span>Home</span>
+                  Home
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -344,16 +385,17 @@ function AppSidebarContent() {
           <SidebarGroupLabel className="px-2">Lesson Plans</SidebarGroupLabel>
           <SidebarGroupContent className="px-2">
             {/* Search and Filter */}
-            <div className="flex items-center gap-2 mb-2">
-              <div className="relative flex-1">
-                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <section className="flex items-center gap-2 mb-2">
+              <section className="relative flex-1">
+                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search plans..."
                   value={lessonPlanSearch}
                   onChange={(e) => setLessonPlanSearch(e.target.value)}
                   className="pl-8 h-8 text-sm"
+                  aria-label="Search lesson plans"
                 />
-              </div>
+              </section>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -403,32 +445,33 @@ function AppSidebarContent() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            </section>
 
             {/* Lesson Plans List */}
-            <div className="max-h-[200px] overflow-y-auto">
+            <nav className="max-h-[200px] overflow-y-auto" aria-label="Lesson plans list">
               {lessonPlans === undefined ? (
-                <div className="space-y-2">
+                <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
-                </div>
+                </section>
               ) : filteredLessonPlans.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 text-center">
                   No lesson plans found
                 </p>
               ) : (
-                <div className="space-y-1">
+                <ul className="space-y-1" role="list">
                   {filteredLessonPlans.map((plan) => (
-                    <LessonPlanItem
-                      key={plan._id}
-                      plan={plan}
-                      onEdit={handleEditLessonPlan}
-                      onDelete={handleDeleteLessonPlan}
-                    />
+                    <li key={plan._id}>
+                      <LessonPlanItem
+                        plan={plan}
+                        onEdit={handleEditLessonPlan}
+                        onDelete={handleDeleteLessonPlan}
+                      />
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
+            </nav>
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -437,41 +480,43 @@ function AppSidebarContent() {
           <SidebarGroupLabel className="px-2">Lesson Notes</SidebarGroupLabel>
           <SidebarGroupContent className="px-2">
             {/* Search */}
-            <div className="mb-2">
-              <div className="relative">
-                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <section className="mb-2">
+              <section className="relative">
+                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search notes..."
                   value={lessonNoteSearch}
                   onChange={(e) => setLessonNoteSearch(e.target.value)}
                   className="pl-8 h-8 text-sm"
+                  aria-label="Search lesson notes"
                 />
-              </div>
-            </div>
+              </section>
+            </section>
 
             {/* Lesson Notes List */}
-            <div className="max-h-[200px] overflow-y-auto">
+            <nav className="max-h-[200px] overflow-y-auto" aria-label="Lesson notes list">
               {lessonNotes === undefined ? (
-                <div className="space-y-2">
+                <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
-                </div>
+                </section>
               ) : filteredLessonNotes.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 text-center">
                   No lesson notes found
                 </p>
               ) : (
-                <div className="space-y-1">
+                <ul className="space-y-1" role="list">
                   {filteredLessonNotes.map((note) => (
-                    <LessonNoteItem
-                      key={note._id}
-                      note={note}
-                      onDelete={handleDeleteLessonNote}
-                    />
+                    <li key={note._id}>
+                      <LessonNoteItem
+                        note={note}
+                        onDelete={handleDeleteLessonNote}
+                      />
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
+            </nav>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
