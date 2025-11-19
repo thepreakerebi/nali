@@ -2,6 +2,11 @@ import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { capitalizeWords, normalizeWhitespace } from "../utils/string";
+import {
+  createAuthError,
+  createNotFoundError,
+  createValidationError,
+} from "../utils/errors";
 
 /**
  * Create or update user profile after Google OAuth sign-in
@@ -72,8 +77,17 @@ export const createOrUpdateUserProfile = mutation({
         updates.onboardingCompleted = true;
       }
 
-      await ctx.db.patch(existingProfile._id, updates);
-      return existingProfile._id;
+      try {
+        await ctx.db.patch(existingProfile._id, updates);
+        return existingProfile._id;
+      } catch (error) {
+        console.error("Error updating user profile:", error);
+        throw createValidationError(
+          "profile update",
+          "Failed to update profile",
+          "Please try again. If the problem persists, refresh the page."
+        );
+      }
     } else {
       // Create new profile with default language set to English
       // Capitalize and normalize schoolName and country before saving
@@ -87,17 +101,26 @@ export const createOrUpdateUserProfile = mutation({
       // Onboarding is complete when both schoolName and country are provided
       const onboardingCompleted = !!(schoolName && country);
       
-      return await ctx.db.insert("userProfiles", {
-        userId,
-        name: args.name,
-        email: args.email,
-        profilePhoto: args.profilePhoto,
-        googleId: args.googleId,
-        schoolName,
-        country,
-        preferredLanguage: args.preferredLanguage ?? "en", // Default to English
-        onboardingCompleted,
-      });
+      try {
+        return await ctx.db.insert("userProfiles", {
+          userId,
+          name: args.name.trim(),
+          email: args.email.trim(),
+          profilePhoto: args.profilePhoto,
+          googleId: args.googleId,
+          schoolName,
+          country,
+          preferredLanguage: args.preferredLanguage ?? "en", // Default to English
+          onboardingCompleted,
+        });
+      } catch (error) {
+        console.error("Error creating user profile:", error);
+        throw createValidationError(
+          "profile creation",
+          "Failed to create profile",
+          "Please try again. If the problem persists, refresh the page or contact support."
+        );
+      }
     }
   },
 });
@@ -116,7 +139,7 @@ export const updatePreferredLanguage = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
     const profile = await ctx.db
@@ -125,14 +148,27 @@ export const updatePreferredLanguage = mutation({
       .first();
 
     if (!profile) {
-      throw new Error("User profile not found. Please create your profile first.");
+      throw createNotFoundError(
+        "user profile",
+        undefined,
+        "Please complete your profile setup first. Go to your profile settings to create your profile."
+      );
     }
 
-    await ctx.db.patch(profile._id, {
-      preferredLanguage: args.preferredLanguage,
-    });
+    try {
+      await ctx.db.patch(profile._id, {
+        preferredLanguage: args.preferredLanguage,
+      });
 
-    return args.preferredLanguage;
+      return args.preferredLanguage;
+    } catch (error) {
+      console.error("Error updating preferred language:", error);
+      throw createValidationError(
+        "language preference",
+        "Failed to update language preference",
+        "Please try again. If the problem persists, refresh the page."
+      );
+    }
   },
 });
 

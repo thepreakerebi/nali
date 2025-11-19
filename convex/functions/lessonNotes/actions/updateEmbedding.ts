@@ -9,6 +9,7 @@ import { internalAction } from "../../../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
 import { generateEmbedding } from "../../utils/embeddings";
+import { createEmbeddingError } from "../../utils/errors";
 
 /**
  * Convert Blocknote JSON content to readable text for embedding generation
@@ -103,17 +104,30 @@ export const updateLessonNoteEmbedding = internalAction({
       const embeddingText = `${planTitle} ${lessonNote.title} ${contentText.substring(0, 1000)}`;
 
       // Generate embedding
-      const embedding = await generateEmbedding(embeddingText);
+      let embedding: number[];
+      try {
+        embedding = await generateEmbedding(embeddingText);
+      } catch (embeddingError) {
+        console.error(`Error generating embedding for lesson note ${args.lessonNoteId}:`, embeddingError);
+        // Don't throw - embedding generation failures shouldn't break the update flow
+        // The embedding will be retried on the next content update
+        return null;
+      }
 
       // Update the lesson note with new embedding
-      await ctx.runMutation(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (internal as any).functions.lessonNotes.mutations.updateEmbedding,
-        {
-          lessonNoteId: args.lessonNoteId,
-          embedding,
-        }
-      );
+      try {
+        await ctx.runMutation(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (internal as any).functions.lessonNotes.mutations.updateEmbedding,
+          {
+            lessonNoteId: args.lessonNoteId,
+            embedding,
+          }
+        );
+      } catch (mutationError) {
+        console.error(`Error saving embedding for lesson note ${args.lessonNoteId}:`, mutationError);
+        // Don't throw - embedding update failures shouldn't break the update flow
+      }
     } catch (error) {
       console.error(`Error updating embedding for lesson note ${args.lessonNoteId}:`, error);
       // Don't throw - embedding update failures shouldn't break the update flow

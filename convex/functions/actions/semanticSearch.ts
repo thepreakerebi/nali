@@ -65,14 +65,27 @@ export const semanticSearch = action({
     )
   ),
   handler: async (ctx, args) => {
-    // Get authenticated user ID
-    const userId = await ctx.runQuery(api.functions.utils.auth.getCurrentUserId, {});
-    if (!userId) {
-      return [];
-    }
+    try {
+      // Get authenticated user ID
+      const userId = await ctx.runQuery(api.functions.utils.auth.getCurrentUserId, {});
+      if (!userId) {
+        return [];
+      }
 
-    // Generate embedding for the search query
-    const queryEmbedding = await generateEmbedding(args.query);
+      // Validate query
+      if (!args.query || args.query.trim().length === 0) {
+        return [];
+      }
+
+      // Generate embedding for the search query
+      let queryEmbedding: number[];
+      try {
+        queryEmbedding = await generateEmbedding(args.query.trim());
+      } catch (embeddingError) {
+        console.error("Error generating embedding for semantic search:", embeddingError);
+        // Return empty array instead of throwing - search failures shouldn't break the app
+        return [];
+      }
 
     // Store optional filter values for proper type narrowing
     const classId = args.classId;
@@ -88,6 +101,7 @@ export const semanticSearch = action({
         {
           vector: queryEmbedding,
           limit: Math.min(args.limit || 10, 20), // Cap at 20
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filter: (q: any) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let filter: any = q.eq("userId", userId);
@@ -108,7 +122,6 @@ export const semanticSearch = action({
 
       // Load the actual lesson plan documents
       const planIds = vectorSearchResults.map((result: { _id: Id<"lessonPlans"> }) => result._id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const plans: Array<{
         _id: Id<"lessonPlans">;
         _creationTime: number;
@@ -159,6 +172,7 @@ export const semanticSearch = action({
         {
           vector: queryEmbedding,
           limit: Math.min(args.limit || 10, 20), // Cap at 20
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filter: (q: any) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let filter: any = q.eq("userId", userId);
@@ -176,7 +190,6 @@ export const semanticSearch = action({
 
       // Load the actual lesson note documents
       const noteIds = vectorSearchResults.map((result: { _id: Id<"lessonNotes"> }) => result._id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const notes: Array<{
         _id: Id<"lessonNotes">;
         _creationTime: number;
@@ -206,6 +219,11 @@ export const semanticSearch = action({
         .sort((a, b) => b.similarityScore - a.similarityScore); // Sort by similarity score descending
 
       return results;
+    }
+    } catch (error) {
+      console.error("Error in semantic search:", error);
+      // Return empty array instead of throwing - search failures shouldn't break the app
+      return [];
     }
   },
 });

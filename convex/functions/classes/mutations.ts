@@ -1,6 +1,13 @@
 import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  createAuthError,
+  createNotFoundError,
+  createAuthorizationError,
+  createDependencyError,
+  createValidationError,
+} from "../utils/errors";
 
 /**
  * Create a new class
@@ -16,15 +23,49 @@ export const createClass = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
-    return await ctx.db.insert("classes", {
-      userId,
-      name: args.name,
-      gradeLevel: args.gradeLevel,
-      academicYear: args.academicYear,
-    });
+    // Validate input
+    if (!args.name || args.name.trim().length === 0) {
+      throw createValidationError(
+        "class name",
+        "Class name cannot be empty",
+        "Please provide a name for your class (e.g., 'Grade 5A' or 'Mathematics Class')."
+      );
+    }
+
+    if (!args.gradeLevel || args.gradeLevel.trim().length === 0) {
+      throw createValidationError(
+        "grade level",
+        "Grade level cannot be empty",
+        "Please specify the grade level (e.g., 'Grade 5' or 'Primary 3')."
+      );
+    }
+
+    if (!args.academicYear || args.academicYear.trim().length === 0) {
+      throw createValidationError(
+        "academic year",
+        "Academic year cannot be empty",
+        "Please specify the academic year (e.g., '2024-2025' or '2024')."
+      );
+    }
+
+    try {
+      return await ctx.db.insert("classes", {
+        userId,
+        name: args.name.trim(),
+        gradeLevel: args.gradeLevel.trim(),
+        academicYear: args.academicYear.trim(),
+      });
+    } catch (error) {
+      console.error("Error creating class:", error);
+      throw createValidationError(
+        "class creation",
+        "Failed to create class",
+        "Please check your input and try again. If the problem persists, refresh the page."
+      );
+    }
   },
 });
 
@@ -43,17 +84,48 @@ export const updateClass = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
     const classDoc = await ctx.db.get(args.classId);
     if (!classDoc) {
-      throw new Error("Class not found");
+      throw createNotFoundError(
+        "class",
+        args.classId,
+        "The class may have been deleted or you may have the wrong ID. Please refresh the page or check your class list."
+      );
     }
 
     // Authorization check: ensure user owns this class
     if (classDoc.userId !== userId) {
-      throw new Error("Unauthorized: You can only update your own classes");
+      throw createAuthorizationError("class", "update");
+    }
+
+    // Validate updates
+    if (args.name !== undefined) {
+      if (!args.name || args.name.trim().length === 0) {
+        throw createValidationError(
+          "class name",
+          "Class name cannot be empty",
+          "Please provide a valid class name or remove this field to keep the current name."
+        );
+      }
+    }
+
+    if (args.gradeLevel !== undefined && args.gradeLevel.trim().length === 0) {
+      throw createValidationError(
+        "grade level",
+        "Grade level cannot be empty",
+        "Please provide a valid grade level or remove this field to keep the current value."
+      );
+    }
+
+    if (args.academicYear !== undefined && args.academicYear.trim().length === 0) {
+      throw createValidationError(
+        "academic year",
+        "Academic year cannot be empty",
+        "Please provide a valid academic year or remove this field to keep the current value."
+      );
     }
 
     const updates: {
@@ -62,12 +134,21 @@ export const updateClass = mutation({
       academicYear?: string;
     } = {};
 
-    if (args.name !== undefined) updates.name = args.name;
-    if (args.gradeLevel !== undefined) updates.gradeLevel = args.gradeLevel;
-    if (args.academicYear !== undefined) updates.academicYear = args.academicYear;
+    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.gradeLevel !== undefined) updates.gradeLevel = args.gradeLevel.trim();
+    if (args.academicYear !== undefined) updates.academicYear = args.academicYear.trim();
 
-    await ctx.db.patch(args.classId, updates);
-    return null;
+    try {
+      await ctx.db.patch(args.classId, updates);
+      return null;
+    } catch (error) {
+      console.error("Error updating class:", error);
+      throw createValidationError(
+        "class update",
+        "Failed to update class",
+        "Please try again. If the problem persists, refresh the page."
+      );
+    }
   },
 });
 
@@ -84,17 +165,21 @@ export const deleteClass = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
     const classDoc = await ctx.db.get(args.classId);
     if (!classDoc) {
-      throw new Error("Class not found");
+      throw createNotFoundError(
+        "class",
+        args.classId,
+        "The class may have been deleted or you may have the wrong ID. Please refresh the page."
+      );
     }
 
     // Authorization check: ensure user owns this class
     if (classDoc.userId !== userId) {
-      throw new Error("Unauthorized: You can only delete your own classes");
+      throw createAuthorizationError("class", "delete");
     }
 
     // Check if there are any lesson plans using this class
@@ -104,13 +189,24 @@ export const deleteClass = mutation({
       .first();
 
     if (lessonPlans) {
-      throw new Error(
-        "Cannot delete class: There are lesson plans associated with this class"
+      throw createDependencyError(
+        "class",
+        "lesson plans",
+        "delete"
       );
     }
 
-    await ctx.db.delete(args.classId);
-    return null;
+    try {
+      await ctx.db.delete(args.classId);
+      return null;
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      throw createValidationError(
+        "class deletion",
+        "Failed to delete class",
+        "Please try again. If the problem persists, refresh the page."
+      );
+    }
   },
 });
 

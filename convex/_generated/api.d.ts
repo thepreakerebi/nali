@@ -33,6 +33,7 @@ import type * as functions_userProfile_mutations from "../functions/userProfile/
 import type * as functions_userProfile_queries from "../functions/userProfile/queries.js";
 import type * as functions_utils_auth from "../functions/utils/auth.js";
 import type * as functions_utils_embeddings from "../functions/utils/embeddings.js";
+import type * as functions_utils_errors from "../functions/utils/errors.js";
 import type * as functions_utils_index from "../functions/utils/index.js";
 import type * as functions_utils_string from "../functions/utils/string.js";
 import type * as http from "../http.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   "functions/userProfile/queries": typeof functions_userProfile_queries;
   "functions/utils/auth": typeof functions_utils_auth;
   "functions/utils/embeddings": typeof functions_utils_embeddings;
+  "functions/utils/errors": typeof functions_utils_errors;
   "functions/utils/index": typeof functions_utils_index;
   "functions/utils/string": typeof functions_utils_string;
   http: typeof http;

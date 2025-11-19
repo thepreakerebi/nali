@@ -21,6 +21,12 @@ import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumRe
 import { createExtractResourceContentTool } from "../tools/extractResourceContent";
 import { createSearchSimilarPlansTool } from "../tools/searchSimilarPlans";
 import { generateEmbedding } from "../../utils/embeddings";
+import {
+  createExternalAPIError,
+  createContentGenerationError,
+  createEmbeddingError,
+  formatError,
+} from "../../utils/errors";
 import type { Id } from "../../../_generated/dataModel";
 
 // Type definitions for tool results
@@ -124,7 +130,10 @@ export const generateLessonPlanStream = action({
         {}
       );
       if (!authUserId) {
-        yield { type: "error", error: "Authentication required" };
+        yield {
+          type: "error",
+          error: "Please sign in to generate lesson plans. Click 'Sign In' to authenticate with your Google account.",
+        };
         return;
       }
 
@@ -148,8 +157,19 @@ export const generateLessonPlanStream = action({
         subjectId: args.subjectId,
       });
 
-      if (!classFull || !subjectFull) {
-        yield { type: "error", error: "Class or subject not found or unauthorized" };
+      if (!classFull) {
+        yield {
+          type: "error",
+          error: "The selected class was not found or you don't have permission to access it. Please select a different class or refresh the page.",
+        };
+        return;
+      }
+
+      if (!subjectFull) {
+        yield {
+          type: "error",
+          error: "The selected subject was not found or you don't have permission to access it. Please select a different subject or refresh the page.",
+        };
         return;
       }
 
@@ -196,7 +216,11 @@ export const generateLessonPlanStream = action({
         }
       } catch (error) {
         console.error("Error searching similar plans:", error);
-        // Continue without similar plans context
+        // Continue without similar plans context - not critical for generation
+        yield {
+          type: "status",
+          message: "Note: Could not load similar lesson plans, but continuing with generation...",
+        };
       }
 
       yield { type: "status", message: "Searching curriculum resources..." };
@@ -408,8 +432,19 @@ export const generateLessonPlanStream = action({
       yield { type: "status", message: "Generating embedding..." };
 
       // Generate embedding for the lesson plan
-      const embeddingText = `${args.topic} ${fullText.substring(0, 1000)}`;
-      const embedding = await generateEmbedding(embeddingText);
+      let embedding: number[];
+      try {
+        const embeddingText = `${args.topic} ${fullText.substring(0, 1000)}`;
+        embedding = await generateEmbedding(embeddingText);
+      } catch (embeddingError) {
+        console.error("Error generating embedding:", embeddingError);
+        const error = createEmbeddingError();
+        yield {
+          type: "error",
+          error: `${error.message} ${error.action || ""}`,
+        };
+        return;
+      }
 
       yield { type: "status", message: "Saving lesson plan..." };
 
@@ -509,10 +544,30 @@ export const generateLessonPlanStream = action({
       };
     } catch (error) {
       console.error("Lesson plan generation stream error:", error);
+      const formattedError = formatError(error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = formattedError.message;
+      if (formattedError.action) {
+        errorMessage += ` ${formattedError.action}`;
+      }
+      
+      // Check for common error patterns
+      if (error instanceof Error) {
+        if (error.message.includes("API") || error.message.includes("Mistral")) {
+          const apiError = createExternalAPIError("Mistral AI", "generate lesson plan", true);
+          errorMessage = `${apiError.message} ${apiError.action || ""}`;
+        } else if (error.message.includes("Firecrawl") || error.message.includes("search")) {
+          const apiError = createExternalAPIError("Firecrawl", "search curriculum resources", true);
+          errorMessage = `${apiError.message} ${apiError.action || ""}`;
+        } else if (error.message.includes("timeout") || error.message.includes("time")) {
+          errorMessage = "The request took too long. Please try again with a simpler topic or check your internet connection.";
+        }
+      }
+      
       yield {
         type: "error",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        error: errorMessage,
       };
     }
   },

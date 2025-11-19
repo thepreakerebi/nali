@@ -2,6 +2,12 @@ import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "../../_generated/api";
+import {
+  createAuthError,
+  createNotFoundError,
+  createAuthorizationError,
+  createValidationError,
+} from "../utils/errors";
 
 /**
  * Update a lesson note
@@ -19,17 +25,32 @@ export const updateLessonNote = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
     const lessonNote = await ctx.db.get(args.lessonNoteId);
     if (!lessonNote) {
-      throw new Error("Lesson note not found");
+      throw createNotFoundError(
+        "lesson note",
+        args.lessonNoteId,
+        "The lesson note may have been deleted or you may have the wrong ID. Please refresh the page or check your lesson notes list."
+      );
     }
 
     // Authorization check: ensure user owns this lesson note
     if (lessonNote.userId !== userId) {
-      throw new Error("Unauthorized: You can only update your own lesson notes");
+      throw createAuthorizationError("lesson note", "update");
+    }
+
+    // Validate title if provided
+    if (args.title !== undefined) {
+      if (!args.title || args.title.trim().length === 0) {
+        throw createValidationError(
+          "title",
+          "Title cannot be empty",
+          "Please provide a title for your lesson note or remove this field to keep the current title."
+        );
+      }
     }
 
     const updates: {
@@ -38,25 +59,39 @@ export const updateLessonNote = mutation({
       embedding?: number[];
     } = {};
 
-    if (args.title !== undefined) updates.title = args.title;
+    if (args.title !== undefined) updates.title = args.title.trim();
     if (args.content !== undefined) updates.content = args.content;
 
-    await ctx.db.patch(args.lessonNoteId, updates);
+    try {
+      await ctx.db.patch(args.lessonNoteId, updates);
 
-    // Schedule embedding update if content or title changed
-    // This runs asynchronously in an action (which can call node functions)
-    if (args.content !== undefined || args.title !== undefined) {
-      await ctx.scheduler.runAfter(
-        0,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (internal as any).functions.lessonNotes.actions.updateEmbedding.updateLessonNoteEmbedding,
-        {
-          lessonNoteId: args.lessonNoteId,
+      // Schedule embedding update if content or title changed
+      // This runs asynchronously in an action (which can call node functions)
+      if (args.content !== undefined || args.title !== undefined) {
+        try {
+          await ctx.scheduler.runAfter(
+            0,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (internal as any).functions.lessonNotes.actions.updateEmbedding.updateLessonNoteEmbedding,
+            {
+              lessonNoteId: args.lessonNoteId,
+            }
+          );
+        } catch (schedulerError) {
+          // Log but don't fail the update if embedding scheduling fails
+          console.error("Error scheduling embedding update:", schedulerError);
         }
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error updating lesson note:", error);
+      throw createValidationError(
+        "lesson note update",
+        "Failed to update lesson note",
+        "Your changes may not have been saved. Please try again. If the problem persists, refresh the page."
       );
     }
-
-    return null;
   },
 });
 
@@ -72,21 +107,34 @@ export const deleteLessonNote = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
-      throw new Error("Authentication required");
+      throw createAuthError();
     }
 
     const lessonNote = await ctx.db.get(args.lessonNoteId);
     if (!lessonNote) {
-      throw new Error("Lesson note not found");
+      throw createNotFoundError(
+        "lesson note",
+        args.lessonNoteId,
+        "The lesson note may have been deleted or you may have the wrong ID. Please refresh the page."
+      );
     }
 
     // Authorization check: ensure user owns this lesson note
     if (lessonNote.userId !== userId) {
-      throw new Error("Unauthorized: You can only delete your own lesson notes");
+      throw createAuthorizationError("lesson note", "delete");
     }
 
-    await ctx.db.delete(args.lessonNoteId);
-    return null;
+    try {
+      await ctx.db.delete(args.lessonNoteId);
+      return null;
+    } catch (error) {
+      console.error("Error deleting lesson note:", error);
+      throw createValidationError(
+        "lesson note deletion",
+        "Failed to delete lesson note",
+        "Please try again. If the problem persists, refresh the page."
+      );
+    }
   },
 });
 

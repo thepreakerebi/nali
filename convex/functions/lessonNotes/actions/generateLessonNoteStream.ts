@@ -17,6 +17,12 @@ import {
 import { createExtractResourceContentTool } from "../../lessonPlans/tools/extractResourceContent";
 import { createSearchSimilarNotesTool } from "../tools/searchSimilarNotes";
 import { generateEmbedding } from "../../utils/embeddings";
+import {
+  createExternalAPIError,
+  createContentGenerationError,
+  createEmbeddingError,
+  formatError,
+} from "../../utils/errors";
 import type { Id } from "../../../_generated/dataModel";
 
 // Type definitions for tool results
@@ -125,7 +131,10 @@ export const generateLessonNoteStream = action({
         {}
       );
       if (!authUserId) {
-        yield { type: "error", error: "Authentication required" };
+        yield {
+          type: "error",
+          error: "Please sign in to generate lesson notes. Click 'Sign In' to authenticate with your Google account.",
+        };
         return;
       }
 
@@ -141,13 +150,19 @@ export const generateLessonNoteStream = action({
       );
 
       if (!lessonPlan) {
-        yield { type: "error", error: "Lesson plan not found" };
+        yield {
+          type: "error",
+          error: "The lesson plan was not found or may have been deleted. Please select a different lesson plan or refresh the page.",
+        };
         return;
       }
 
       // Verify ownership
       if (lessonPlan.userId !== authUserId) {
-        yield { type: "error", error: "Unauthorized: You can only generate notes for your own lesson plans" };
+        yield {
+          type: "error",
+          error: "You can only generate notes for lesson plans that belong to you. Please select one of your own lesson plans.",
+        };
         return;
       }
 
@@ -160,8 +175,19 @@ export const generateLessonNoteStream = action({
         }
       );
 
-      if (!classDoc || !subjectDoc) {
-        yield { type: "error", error: "Class or subject not found" };
+      if (!classDoc) {
+        yield {
+          type: "error",
+          error: "The class associated with this lesson plan was not found. Please check your lesson plan or refresh the page.",
+        };
+        return;
+      }
+
+      if (!subjectDoc) {
+        yield {
+          type: "error",
+          error: "The subject associated with this lesson plan was not found. Please check your lesson plan or refresh the page.",
+        };
         return;
       }
 
@@ -206,7 +232,11 @@ export const generateLessonNoteStream = action({
         }
       } catch (error) {
         console.error("Error searching similar notes:", error);
-        // Continue without similar notes context
+        // Continue without similar notes context - not critical for generation
+        yield {
+          type: "status",
+          message: "Note: Could not load similar lesson notes, but continuing with generation...",
+        };
       }
 
       yield { type: "status", message: "Extracting detailed resource content..." };
@@ -348,15 +378,30 @@ export const generateLessonNoteStream = action({
       }
 
       if (!fullText.trim()) {
-        yield { type: "error", error: "Failed to generate lesson note content" };
+        const error = createContentGenerationError("content generation");
+        yield {
+          type: "error",
+          error: `${error.message} ${error.action || ""}`,
+        };
         return;
       }
 
       yield { type: "status", message: "Generating embedding..." };
 
       // Generate embedding for the lesson note
-      const embeddingText = `${lessonPlan.title} ${fullText.substring(0, 1000)}`;
-      const embedding = await generateEmbedding(embeddingText);
+      let embedding: number[];
+      try {
+        const embeddingText = `${lessonPlan.title} ${fullText.substring(0, 1000)}`;
+        embedding = await generateEmbedding(embeddingText);
+      } catch (embeddingError) {
+        console.error("Error generating embedding:", embeddingError);
+        const error = createEmbeddingError();
+        yield {
+          type: "error",
+          error: `${error.message} ${error.action || ""}`,
+        };
+        return;
+      }
 
       yield { type: "status", message: "Saving lesson note..." };
 
@@ -449,10 +494,30 @@ export const generateLessonNoteStream = action({
       };
     } catch (error) {
       console.error("Lesson note generation stream error:", error);
+      const formattedError = formatError(error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = formattedError.message;
+      if (formattedError.action) {
+        errorMessage += ` ${formattedError.action}`;
+      }
+      
+      // Check for common error patterns
+      if (error instanceof Error) {
+        if (error.message.includes("API") || error.message.includes("Mistral")) {
+          const apiError = createExternalAPIError("Mistral AI", "generate lesson note", true);
+          errorMessage = `${apiError.message} ${apiError.action || ""}`;
+        } else if (error.message.includes("Firecrawl") || error.message.includes("extract")) {
+          const apiError = createExternalAPIError("Firecrawl", "extract resource content", true);
+          errorMessage = `${apiError.message} ${apiError.action || ""}`;
+        } else if (error.message.includes("timeout") || error.message.includes("time")) {
+          errorMessage = "The request took too long. Please try again or check your internet connection.";
+        }
+      }
+      
       yield {
         type: "error",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        error: errorMessage,
       };
     }
   },
