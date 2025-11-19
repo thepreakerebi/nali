@@ -3,6 +3,8 @@ import { Rethink_Sans } from "next/font/google";
 import "./globals.css";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
+import IntlClientProvider from "@/components/IntlClientProvider";
+import { getDictionary } from "@/lib/get-dictionary";
 
 const rethinkSans = Rethink_Sans({
   variable: "--font-sans",
@@ -18,17 +20,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Default to English for now (will be updated when language routing is implemented)
+  const messages = await getDictionary("en");
+
   return (
     <ConvexAuthNextjsServerProvider>
       <html lang="en" suppressHydrationWarning={true}>
         <body className={`${rethinkSans.variable} antialiased`}>
           <ConvexClientProvider>
-            {children}
+            <IntlClientProvider locale="en" messages={messages}>
+              {children}
+            </IntlClientProvider>
           </ConvexClientProvider>
         </body>
       </html>

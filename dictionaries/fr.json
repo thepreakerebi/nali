@@ -1,0 +1,10 @@
+{
+  "signin.title": "Bienvenue sur Nali",
+  "signin.subtitle": "Planification de cours assistée par IA pour les enseignants",
+  "signin.description": "Connectez-vous avec votre compte Google pour commencer à créer des plans de cours et des notes complets.",
+  "signin.button": "Se connecter avec Google",
+  "signin.loading": "Connexion en cours...",
+  "signin.error": "Erreur",
+  "signin.error.generic": "Une erreur s'est produite lors de la connexion. Veuillez réessayer."
+}
+

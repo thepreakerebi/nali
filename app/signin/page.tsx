@@ -4,115 +4,110 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
+import { useIntl } from "react-intl";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function SignIn() {
   const { signIn } = useAuthActions();
-  const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const intl = useIntl();
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signIn("google");
+      router.push("/");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : intl.formatMessage({ id: "signin.error.generic" })
+      );
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-8 w-full max-w-lg mx-auto h-screen justify-center items-center px-4">
-      <div className="text-center flex flex-col items-center gap-4">
-        <div className="flex items-center gap-6">
-          <Image
-            src="/convex.svg"
-            alt="Convex Logo"
-            width={90}
-            height={90}
-          />
-          <div className="w-px h-20 bg-slate-300 dark:bg-slate-600"></div>
-          <Image
-            src="/nextjs-icon-light-background.svg"
-            alt="Next.js Logo"
-            width={90}
-            height={90}
-            className="dark:hidden"
-          />
-          <Image
-            src="/nextjs-icon-dark-background.svg"
-            alt="Next.js Logo"
-            width={90}
-            height={90}
-            className="hidden dark:block"
-          />
-        </div>
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">
-          Convex + Next.js + Convex Auth
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          This demo uses Convex Auth for authentication, so you will need to
-          sign in or sign up to access the demo.
-        </p>
-      </div>
-      <form
-        className="flex flex-col gap-4 w-full bg-slate-100 dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-300 dark:border-slate-600"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setLoading(true);
-          setError(null);
-          const formData = new FormData(e.target as HTMLFormElement);
-          formData.set("flow", flow);
-          void signIn("password", formData)
-            .catch((error) => {
-              setError(error.message);
-              setLoading(false);
-            })
-            .then(() => {
-              router.push("/");
-            });
+    <main className="min-h-screen w-full bg-white relative">
+      {/* Teal Glow Background */}
+      <section
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `
+            radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #14b8a6 100%)
+          `,
+          backgroundSize: "100% 100%",
         }}
-      >
-        <input
-          className="bg-white dark:bg-slate-900 text-foreground rounded-lg p-3 border border-slate-300 dark:border-slate-600 focus:border-slate-500 dark:focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700 outline-none transition-all placeholder:text-slate-400"
-          type="email"
-          name="email"
-          placeholder="Email"
-          required
-        />
-        <div className="flex flex-col gap-1">
-          <input
-            className="bg-white dark:bg-slate-900 text-foreground rounded-lg p-3 border border-slate-300 dark:border-slate-600 focus:border-slate-500 dark:focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700 outline-none transition-all placeholder:text-slate-400"
-            type="password"
-            name="password"
-            placeholder="Password"
-            minLength={8}
-            required
+        aria-hidden="true"
+      />
+
+      {/* Content */}
+      <section className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
+        <header className="text-center flex flex-col items-center gap-6 mb-12">
+          <Image
+            src="/nali-logo.svg"
+            alt="Nali Logo"
+            width={115}
+            height={33}
+            priority
           />
-          {flow === "signUp" && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 px-1">
-              Password must be at least 8 characters
-            </p>
-          )}
-        </div>
-        <button
-          className="bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg py-3 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          type="submit"
-          disabled={loading}
-        >
-          {loading ? "Loading..." : flow === "signIn" ? "Sign in" : "Sign up"}
-        </button>
-        <div className="flex flex-row gap-2 text-sm justify-center">
-          <span className="text-slate-600 dark:text-slate-400">
-            {flow === "signIn"
-              ? "Don't have an account?"
-              : "Already have an account?"}
-          </span>
-          <span
-            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 font-medium underline decoration-2 underline-offset-2 hover:no-underline cursor-pointer transition-colors"
-            onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+          <h1 className="text-4xl font-bold text-slate-900">
+            {intl.formatMessage({ id: "signin.title" })}
+        </h1>
+          <p className="text-lg font-medium text-slate-700">
+            {intl.formatMessage({ id: "signin.subtitle" })}
+          </p>
+          <p className="text-base text-slate-600 max-w-md">
+            {intl.formatMessage({ id: "signin.description" })}
+          </p>
+        </header>
+
+        <article className="w-full max-w-md">
+          <Button
+            type="button"
+            size="lg"
+            onClick={handleSignIn}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-white/80 backdrop-blur-md hover:bg-white/90 text-slate-900 font-semibold shadow-lg hover:shadow-xl border border-white/50 rounded-full"
+            aria-label={intl.formatMessage({ id: "signin.button" })}
           >
-            {flow === "signIn" ? "Sign up" : "Sign in"}
-          </span>
-        </div>
+            {loading ? (
+              <section>
+                <Spinner className="h-5 w-5 text-slate-900" />
+                {intl.formatMessage({ id: "signin.loading" })}
+              </section>
+            ) : (
+              <>
+                <Image
+                  src="/google.svg"
+                  alt=""
+                  width={14}
+                  height={15}
+                  aria-hidden="true"
+                />
+                {intl.formatMessage({ id: "signin.button" })}
+              </>
+            )}
+          </Button>
+
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/30 dark:border-rose-500/50 rounded-lg p-4">
-            <p className="text-rose-700 dark:text-rose-300 font-medium text-sm break-words">
-              Error: {error}
-            </p>
-          </div>
-        )}
-      </form>
-    </div>
+            <section
+              className="mt-6 bg-rose-50 border border-rose-200 rounded-lg p-4"
+              role="alert"
+              aria-live="polite"
+            >
+              <p className="text-rose-800 font-medium text-sm wrap-break-word">
+                <strong>{intl.formatMessage({ id: "signin.error" })}:</strong>{" "}
+                {error}
+              </p>
+            </section>
+          )}
+        </article>
+      </section>
+    </main>
   );
 }

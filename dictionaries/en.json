@@ -1,0 +1,10 @@
+{
+  "signin.title": "Welcome to Nali",
+  "signin.subtitle": "AI-powered lesson planning for teachers",
+  "signin.description": "Sign in with your Google account to get started creating comprehensive lesson plans and notes.",
+  "signin.button": "Sign in with Google",
+  "signin.loading": "Signing in...",
+  "signin.error": "Error",
+  "signin.error.generic": "An error occurred during sign in. Please try again."
+}
+
