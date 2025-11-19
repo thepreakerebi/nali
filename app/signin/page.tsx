@@ -72,14 +72,14 @@ export default function SignIn() {
             size="lg"
             onClick={handleSignIn}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white/80 backdrop-blur-md hover:bg-white/90 text-slate-900 font-semibold shadow-lg hover:shadow-xl border border-white/50 rounded-full"
+            className="w-full flex flex-row items-center justify-center gap-3 bg-white/80 backdrop-blur-md hover:bg-white/90 text-slate-900 font-semibold shadow-lg hover:shadow-xl border border-white/50 rounded-full"
             aria-label={intl.formatMessage({ id: "signin.button" })}
           >
             {loading ? (
-              <section>
-                <Spinner className="h-5 w-5 text-slate-900" />
+              <>
+                <Spinner className="size-4" />
                 {intl.formatMessage({ id: "signin.loading" })}
-              </section>
+              </>
             ) : (
               <>
                 <Image
@@ -88,6 +88,7 @@ export default function SignIn() {
                   width={14}
                   height={15}
                   aria-hidden="true"
+                  className="shrink-0"
                 />
                 {intl.formatMessage({ id: "signin.button" })}
               </>
