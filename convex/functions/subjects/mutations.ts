@@ -8,6 +8,7 @@ import {
   createDependencyError,
   createValidationError,
 } from "../utils/errors";
+import { toTitleCase } from "../utils/string";
 
 /**
  * Create a new subject
@@ -37,7 +38,7 @@ export const createSubject = mutation({
     try {
       return await ctx.db.insert("subjects", {
         userId,
-        name: args.name.trim(),
+        name: toTitleCase(args.name.trim()),
         description: args.description?.trim(),
       });
     } catch (error) {
@@ -98,7 +99,7 @@ export const updateSubject = mutation({
       description?: string;
     } = {};
 
-    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.name !== undefined) updates.name = toTitleCase(args.name.trim());
     if (args.description !== undefined) updates.description = args.description.trim();
 
     try {

@@ -8,6 +8,7 @@ import {
   createDependencyError,
   createValidationError,
 } from "../utils/errors";
+import { toTitleCase } from "../utils/string";
 
 /**
  * Create a new class
@@ -54,9 +55,9 @@ export const createClass = mutation({
     try {
       return await ctx.db.insert("classes", {
         userId,
-        name: args.name.trim(),
-        gradeLevel: args.gradeLevel.trim(),
-        academicYear: args.academicYear.trim(),
+        name: toTitleCase(args.name.trim()),
+        gradeLevel: toTitleCase(args.gradeLevel.trim()),
+        academicYear: toTitleCase(args.academicYear.trim()),
       });
     } catch (error) {
       console.error("Error creating class:", error);
@@ -134,9 +135,9 @@ export const updateClass = mutation({
       academicYear?: string;
     } = {};
 
-    if (args.name !== undefined) updates.name = args.name.trim();
-    if (args.gradeLevel !== undefined) updates.gradeLevel = args.gradeLevel.trim();
-    if (args.academicYear !== undefined) updates.academicYear = args.academicYear.trim();
+    if (args.name !== undefined) updates.name = toTitleCase(args.name.trim());
+    if (args.gradeLevel !== undefined) updates.gradeLevel = toTitleCase(args.gradeLevel.trim());
+    if (args.academicYear !== undefined) updates.academicYear = toTitleCase(args.academicYear.trim());
 
     try {
       await ctx.db.patch(args.classId, updates);
