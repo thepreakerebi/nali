@@ -25,13 +25,19 @@ export function SubjectListItem({ subject, onEdit, onDelete }: SubjectListItemPr
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <section className="flex-1 min-w-0">
-        <p className="font-medium truncate mb-1">{subject.name}</p>
-        {subject.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {subject.description}
-          </p>
-        )}
+      <section className="flex-1 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subject Name</dt>
+            <dd className="text-sm font-medium text-foreground">{subject.name}</dd>
+          </div>
+          {subject.description && (
+            <div className="space-y-1 sm:col-span-2">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</dt>
+              <dd className="text-sm text-foreground line-clamp-2">{subject.description}</dd>
+            </div>
+          )}
+        </div>
       </section>
       {isHovered && (
         <nav className="flex items-center gap-1 shrink-0 mt-1" aria-label="Subject actions">

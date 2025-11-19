@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { ClassListItem } from "@/app/_components/classListItem";
 import { SubjectListItem } from "@/app/_components/subjectListItem";
+import { AddClassModal } from "@/app/_components/addClassModal";
 import { toast } from "sonner";
 
 interface StatCardProps {
@@ -25,7 +26,19 @@ interface StatCardProps {
 
 function StatCard({ title, icon, count, onAdd }: StatCardProps) {
   return (
-    <Card className="flex flex-col gap-0 p-2">
+    <Card 
+      className="flex flex-col gap-0 p-2 cursor-pointer transition-colors hover:bg-accent"
+      onClick={onAdd}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onAdd();
+        }
+      }}
+      aria-label={`Add ${title.toLowerCase()}`}
+    >
       <header className="flex items-center justify-between gap-2 p-2">
         <section className="flex items-center gap-2">
           {icon}
@@ -35,7 +48,10 @@ function StatCard({ title, icon, count, onAdd }: StatCardProps) {
           variant="ghost"
           size="icon"
           className="h-6 w-6 shrink-0"
-          onClick={onAdd}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
           aria-label={`Add ${title.toLowerCase()}`}
         >
           <Plus className="h-4 w-4" />
@@ -54,6 +70,7 @@ function StatCard({ title, icon, count, onAdd }: StatCardProps) {
 
 export default function Home() {
   const router = useRouter();
+  const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -87,8 +104,7 @@ export default function Home() {
   }, [userProfile, router]);
 
   const handleCreateClass = () => {
-    // TODO: Navigate to create class page when implemented
-    router.push("/classes/new");
+    setIsAddClassModalOpen(true);
   };
 
   const handleCreateSubject = () => {
@@ -151,8 +167,13 @@ export default function Home() {
   }
 
   return (
-    <main className="h-full w-full overflow-auto">
-      <section className="flex flex-col w-full gap-4">
+    <section className="h-full w-full">
+      <AddClassModal
+        open={isAddClassModalOpen}
+        onOpenChange={setIsAddClassModalOpen}
+      />
+      <main className="h-full w-full overflow-auto">
+        <section className="flex flex-col w-full gap-4">
         {/* Stats Cards Section */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -260,6 +281,7 @@ export default function Home() {
         </section>
       </section>
     </main>
+    </section>
   );
 }
 

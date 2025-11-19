@@ -22,14 +22,25 @@ export function ClassListItem({ classItem, onEdit, onDelete }: ClassListItemProp
 
   return (
     <article
-      className="group relative flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-accent"
+      className="group relative flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-slate-50"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <section className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
-        <p className="font-medium truncate">{classItem.name}</p>
-        <p className="text-sm text-muted-foreground truncate">{classItem.gradeLevel}</p>
-        <p className="text-sm text-muted-foreground truncate">{classItem.academicYear}</p>
+      <section className="flex-1 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Class Name</dt>
+            <dd className="text-sm font-medium text-foreground">{classItem.name}</dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grade Level</dt>
+            <dd className="text-sm text-foreground">{classItem.gradeLevel}</dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Academic Year</dt>
+            <dd className="text-sm text-foreground">{classItem.academicYear}</dd>
+          </div>
+        </div>
       </section>
       {isHovered && (
         <nav className="flex items-center gap-1 shrink-0" aria-label="Class actions">
