@@ -95,3 +95,53 @@ export const getClassAndSubjectDetails = internalQuery({
   },
 });
 
+/**
+ * Internal query to get lesson plan title and content for embedding generation
+ */
+export const getLessonPlanForEmbedding = internalQuery({
+  args: {
+    lessonPlanId: v.id("lessonPlans"),
+  },
+  returns: v.union(
+    v.object({
+      title: v.string(),
+      content: v.any(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const plan = await ctx.db.get(args.lessonPlanId);
+    if (!plan) {
+      return null;
+    }
+    return {
+      title: plan.title,
+      content: plan.content,
+    };
+  },
+});
+
+/**
+ * Internal query to get lesson plan title only
+ */
+export const getLessonPlanTitle = internalQuery({
+  args: {
+    lessonPlanId: v.id("lessonPlans"),
+  },
+  returns: v.union(
+    v.object({
+      title: v.string(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const plan = await ctx.db.get(args.lessonPlanId);
+    if (!plan) {
+      return null;
+    }
+    return {
+      title: plan.title,
+    };
+  },
+});
+

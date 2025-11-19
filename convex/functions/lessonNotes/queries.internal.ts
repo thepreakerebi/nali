@@ -150,3 +150,31 @@ export const loadNotesByIds = internalQuery({
   },
 });
 
+/**
+ * Internal query to get lesson note title and content for embedding generation
+ */
+export const getLessonNoteForEmbedding = internalQuery({
+  args: {
+    lessonNoteId: v.id("lessonNotes"),
+  },
+  returns: v.union(
+    v.object({
+      title: v.string(),
+      content: v.any(),
+      lessonPlanId: v.id("lessonPlans"),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.lessonNoteId);
+    if (!note) {
+      return null;
+    }
+    return {
+      title: note.title,
+      content: note.content,
+      lessonPlanId: note.lessonPlanId,
+    };
+  },
+});
+

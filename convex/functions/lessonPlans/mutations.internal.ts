@@ -47,3 +47,20 @@ export const createLessonPlan = internalMutation({
   },
 });
 
+/**
+ * Internal mutation to update lesson plan embedding
+ */
+export const updateEmbedding = internalMutation({
+  args: {
+    lessonPlanId: v.id("lessonPlans"),
+    embedding: v.array(v.float64()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.lessonPlanId, {
+      embedding: args.embedding,
+    });
+    return null;
+  },
+});
+
