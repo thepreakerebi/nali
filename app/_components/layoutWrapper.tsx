@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "./sidebar";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 const NO_SIDEBAR_PATHS = ["/signin", "/onboarding"];
 
@@ -15,15 +15,17 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <section className="flex h-screen w-full">
-      <AppSidebar />
-      <SidebarInset className="flex-1 overflow-auto">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-        </header>
-        <main className="flex-1 p-4">{children}</main>
-      </SidebarInset>
-    </section>
+    <SidebarProvider>
+      <section className="flex h-screen w-full">
+        <AppSidebar />
+        <SidebarInset className="flex-1 overflow-auto">
+          <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+            <SidebarTrigger />
+          </header>
+          <main className="flex-1 p-4">{children}</main>
+        </SidebarInset>
+      </section>
+    </SidebarProvider>
   );
 }
 
