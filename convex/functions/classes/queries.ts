@@ -32,6 +32,28 @@ export const listClasses = query({
 });
 
 /**
+ * Get count of classes for the current authenticated user
+ * Returns 0 if not authenticated
+ */
+export const getClassesCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return 0;
+    }
+
+    const classes = await ctx.db
+      .query("classes")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    return classes.length;
+  },
+});
+
+/**
  * Get a class by ID
  * Requires authentication and returns null if class doesn't exist or user doesn't own it
  */
@@ -65,4 +87,3 @@ export const getClass = query({
     return classDoc;
   },
 });
-

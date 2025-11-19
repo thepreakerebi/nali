@@ -31,6 +31,28 @@ export const listSubjects = query({
 });
 
 /**
+ * Get count of subjects for the current authenticated user
+ * Returns 0 if not authenticated
+ */
+export const getSubjectsCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return 0;
+    }
+
+    const subjects = await ctx.db
+      .query("subjects")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    return subjects.length;
+  },
+});
+
+/**
  * Get a subject by ID
  * Requires authentication and returns null if subject doesn't exist or user doesn't own it
  */
@@ -63,4 +85,3 @@ export const getSubject = query({
     return subjectDoc;
   },
 });
-

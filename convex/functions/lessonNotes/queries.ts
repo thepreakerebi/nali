@@ -53,6 +53,28 @@ export const listLessonNotes = query({
 });
 
 /**
+ * Get count of lesson notes for the current authenticated user
+ * Returns 0 if not authenticated
+ */
+export const getLessonNotesCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return 0;
+    }
+
+    const lessonNotes = await ctx.db
+      .query("lessonNotes")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    return lessonNotes.length;
+  },
+});
+
+/**
  * Get a lesson note by ID
  * Requires authentication and returns null if note doesn't exist or user doesn't own it
  */

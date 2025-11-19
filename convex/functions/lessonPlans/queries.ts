@@ -91,6 +91,28 @@ export const listLessonPlans = query({
 });
 
 /**
+ * Get count of lesson plans for the current authenticated user
+ * Returns 0 if not authenticated
+ */
+export const getLessonPlansCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return 0;
+    }
+
+    const lessonPlans = await ctx.db
+      .query("lessonPlans")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    return lessonPlans.length;
+  },
+});
+
+/**
  * Get a lesson plan by ID
  * Requires authentication and returns null if plan doesn't exist or user doesn't own it
  */

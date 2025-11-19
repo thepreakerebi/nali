@@ -49,6 +49,7 @@ function AppSidebarContent() {
   const [lessonNoteSearch, setLessonNoteSearch] = useState("");
   const [selectedClassId, setSelectedClassId] = useState<Id<"classes"> | undefined>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<Id<"subjects"> | undefined>();
+  const [selectedLessonPlanId, setSelectedLessonPlanId] = useState<Id<"lessonPlans"> | undefined>();
   const [isMounted, setIsMounted] = useState(false);
 
   React.useEffect(() => {
@@ -65,7 +66,10 @@ function AppSidebarContent() {
         }
       : {}
   );
-  const lessonNotes = useQuery(api.functions.lessonNotes.queries.listLessonNotes, {});
+  const lessonNotes = useQuery(
+    api.functions.lessonNotes.queries.listLessonNotes,
+    selectedLessonPlanId ? { lessonPlanId: selectedLessonPlanId } : {}
+  );
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
   const deleteLessonPlan = useMutation(api.functions.lessonPlans.mutations.deleteLessonPlan);
@@ -190,12 +194,12 @@ function AppSidebarContent() {
                 />
               </section>
               {isMounted ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <FilterIcon className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <FilterIcon className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem
                     onClick={() => {
@@ -238,7 +242,7 @@ function AppSidebarContent() {
                     </>
                   )}
                 </DropdownMenuContent>
-                </DropdownMenu>
+              </DropdownMenu>
               ) : (
                 <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
                   <FilterIcon className="size-4" />
@@ -262,14 +266,14 @@ function AppSidebarContent() {
                   {filteredLessonPlans.map((plan) => {
                     const isActive = pathname === `/lesson-plans/${plan._id}`;
                     return (
-                      <li key={plan._id}>
-                        <LessonPlanItem
-                          plan={plan}
+                    <li key={plan._id}>
+                      <LessonPlanItem
+                        plan={plan}
                           isActive={isActive}
-                          onEdit={handleEditLessonPlan}
-                          onDelete={handleDeleteLessonPlan}
-                        />
-                      </li>
+                        onEdit={handleEditLessonPlan}
+                        onDelete={handleDeleteLessonPlan}
+                      />
+                    </li>
                     );
                   })}
                 </ul>
@@ -308,57 +312,41 @@ function AppSidebarContent() {
                 />
               </section>
               {isMounted ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <FilterIcon className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setSelectedClassId(undefined);
-                        setSelectedSubjectId(undefined);
-                      }}
-                    >
-                      All Classes & Subjects
-                    </DropdownMenuItem>
-                    {classes && classes.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator />
-                        {classes.map((classItem) => (
-                          <DropdownMenuItem
-                            key={classItem._id}
-                            onClick={() => {
-                              setSelectedClassId(classItem._id);
-                              setSelectedSubjectId(undefined);
-                            }}
-                          >
-                            {classItem.name}
-                          </DropdownMenuItem>
-                        ))}
-                      </>
-                    )}
-                    {subjects && subjects.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator />
-                        {subjects.map((subject) => (
-                          <DropdownMenuItem
-                            key={subject._id}
-                            onClick={() => {
-                              setSelectedSubjectId(subject._id);
-                              setSelectedClassId(undefined);
-                            }}
-                          >
-                            {subject.name}
-                          </DropdownMenuItem>
-                        ))}
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <FilterIcon className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedLessonPlanId(undefined);
+                    }}
+                  >
+                    All Lesson Plans
+                  </DropdownMenuItem>
+                  {lessonPlans && lessonPlans.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      {lessonPlans.map((plan) => (
+                        <DropdownMenuItem
+                          key={plan._id}
+                          onClick={() => {
+                            setSelectedLessonPlanId(plan._id);
+                          }}
+                        >
+                          {plan.title}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               ) : (
-                <div className="h-8 w-8" />
+                <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                  <FilterIcon className="size-4" />
+                </Button>
               )}
             </section>
 
@@ -378,13 +366,13 @@ function AppSidebarContent() {
                   {filteredLessonNotes.map((note) => {
                     const isActive = pathname === `/lesson-notes/${note._id}`;
                     return (
-                      <li key={note._id}>
-                        <LessonNoteItem
-                          note={note}
+                    <li key={note._id}>
+                      <LessonNoteItem
+                        note={note}
                           isActive={isActive}
-                          onDelete={handleDeleteLessonNote}
-                        />
-                      </li>
+                        onDelete={handleDeleteLessonNote}
+                      />
+                    </li>
                     );
                   })}
                 </ul>
