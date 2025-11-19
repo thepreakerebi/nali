@@ -10,9 +10,9 @@ import { Check, ChevronDown, X } from 'lucide-react';
 const inputVariants = cva(
   `
     flex w-full bg-background border border-input shadow-xs shadow-black/5 transition-[color,box-shadow] text-foreground placeholder:text-muted-foreground/80 
-    focus-visible:ring-ring/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px]     
-    has-[[data-slot=combobox-input]:focus-visible]:ring-ring/30 
-    has-[[data-slot=combobox-input]:focus-visible]:border-ring
+    focus-visible:ring-primary/50 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px]     
+    has-[[data-slot=combobox-input]:focus-visible]:ring-primary/50 
+    has-[[data-slot=combobox-input]:focus-visible]:border-primary
     has-[[data-slot=combobox-input]:focus-visible]:outline-none
     has-[[data-slot=combobox-input]:focus-visible]:ring-[3px]
     [&_[data-slot=combobox-input]]:grow
@@ -78,7 +78,11 @@ function ComboboxInput({
     <ComboboxPrimitive.Input
       data-slot="combobox-input"
       data-variant={variant}
-      className={cn(inputVariants({ variant }), className)}
+      className={cn(
+        inputVariants({ variant }),
+        'dark:bg-input/30 bg-transparent',
+        className
+      )}
       {...props}
     />
   );

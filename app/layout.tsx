@@ -5,6 +5,7 @@ import "./globals.css";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import IntlClientProvider from "@/components/IntlClientProvider";
+import { Toaster } from "@/components/ui/sonner";
 import { getDictionary } from "@/lib/get-dictionary";
 import { defaultLocale, localeCookieName, locales, type Locale } from "@/i18n.config";
 
@@ -49,6 +50,7 @@ export default async function RootLayout({
           <ConvexClientProvider>
             <IntlClientProvider locale={locale} messages={messages}>
               {children}
+              <Toaster />
             </IntlClientProvider>
           </ConvexClientProvider>
         </body>

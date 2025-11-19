@@ -91,7 +91,7 @@ export default function LanguageSwitcher({
       const intlLocale = intl.locale.split("-")[0] as Locale;
       // Check cookie first to ensure we respect user's choice
       let cookieLocale: Locale | null = null;
-      if (typeof document !== "undefined") {
+    if (typeof document !== "undefined") {
         const cookies = document.cookie.split(";");
         const localeCookie = cookies.find((c) =>
           c.trim().startsWith(`${localeCookieName}=`)

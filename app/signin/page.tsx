@@ -2,9 +2,12 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useIntl } from "react-intl";
+import { useQuery } from "convex/react";
+import { toast } from "sonner";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -14,13 +17,18 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const intl = useIntl();
+  const hasShownToast = useRef(false);
+  
+  // Check user profile after sign-in to determine redirect
+  const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
 
   const handleSignIn = async () => {
     setLoading(true);
     setError(null);
     try {
       await signIn("google");
-      router.push("/");
+      // Wait a bit for profile to be available, then redirect
+      // The redirect will be handled by useEffect below
     } catch (err) {
       setError(
         err instanceof Error
@@ -30,6 +38,23 @@ export default function SignIn() {
       setLoading(false);
     }
   };
+
+  // Redirect after successful sign-in based on onboarding status
+  // Always redirect to onboarding first - it will redirect to home if already completed
+  // This prevents the flash of home page
+  useEffect(() => {
+    if (userProfile !== undefined && !loading) {
+      // Show success toast once when user successfully signs in
+      if (userProfile !== null && !hasShownToast.current) {
+        hasShownToast.current = true;
+        toast.success("You're signed in");
+      }
+      
+      // Always redirect to onboarding first
+      // The onboarding page will check if onboarding is completed and redirect to home if needed
+      router.replace("/onboarding");
+    }
+  }, [userProfile, loading, router]);
 
   return (
     <main className="min-h-screen w-full bg-white relative">

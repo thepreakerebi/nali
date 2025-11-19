@@ -5,15 +5,26 @@ import {
 } from "@convex-dev/auth/nextjs/server";
 
 const isSignInPage = createRouteMatcher(["/signin"]);
-const isProtectedRoute = createRouteMatcher(["/"]);
+const isProtectedRoute = createRouteMatcher(["/", "/onboarding"]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
-  if (isSignInPage(request) && (await convexAuth.isAuthenticated())) {
-    return nextjsMiddlewareRedirect(request, "/");
+  const isAuthenticated = await convexAuth.isAuthenticated();
+  
+  // Redirect authenticated users away from signin page
+  // Redirect to onboarding first - onboarding page will redirect to home if already completed
+  // This prevents users from seeing the home page flash before onboarding
+  if (isSignInPage(request) && isAuthenticated) {
+    return nextjsMiddlewareRedirect(request, "/onboarding");
   }
-  if (isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
+  
+  // Protect routes that require authentication
+  if (isProtectedRoute(request) && !isAuthenticated) {
     return nextjsMiddlewareRedirect(request, "/signin");
   }
+  
+  // Onboarding page is protected - users must be authenticated
+  // The page itself will check if onboarding is completed and redirect accordingly
+  // No additional middleware logic needed here since the page handles the check
 });
 
 export const config = {
