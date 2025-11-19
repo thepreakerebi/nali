@@ -1,6 +1,7 @@
 import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { capitalizeWords, normalizeWhitespace } from "../utils/string";
 
 /**
  * Create or update user profile after Google OAuth sign-in
@@ -41,29 +42,61 @@ export const createOrUpdateUserProfile = mutation({
         schoolName?: string;
         country?: string;
         preferredLanguage?: "en" | "fr" | "rw";
+        onboardingCompleted?: boolean;
       } = {};
 
       if (args.name !== undefined) updates.name = args.name;
       if (args.email !== undefined) updates.email = args.email;
       if (args.profilePhoto !== undefined) updates.profilePhoto = args.profilePhoto;
       if (args.googleId !== undefined) updates.googleId = args.googleId;
-      if (args.schoolName !== undefined) updates.schoolName = args.schoolName;
-      if (args.country !== undefined) updates.country = args.country;
+      if (args.schoolName !== undefined) {
+        // Capitalize and normalize school name
+        updates.schoolName = capitalizeWords(normalizeWhitespace(args.schoolName));
+      }
+      if (args.country !== undefined) {
+        // Capitalize and normalize country name
+        updates.country = capitalizeWords(normalizeWhitespace(args.country));
+      }
       if (args.preferredLanguage !== undefined) updates.preferredLanguage = args.preferredLanguage;
+
+      // Check if onboarding should be marked as completed
+      // Onboarding is complete when both schoolName and country are provided
+      const finalSchoolName = args.schoolName !== undefined 
+        ? capitalizeWords(normalizeWhitespace(args.schoolName))
+        : existingProfile.schoolName;
+      const finalCountry = args.country !== undefined 
+        ? capitalizeWords(normalizeWhitespace(args.country))
+        : existingProfile.country;
+      
+      if (finalSchoolName && finalCountry) {
+        updates.onboardingCompleted = true;
+      }
 
       await ctx.db.patch(existingProfile._id, updates);
       return existingProfile._id;
     } else {
       // Create new profile with default language set to English
+      // Capitalize and normalize schoolName and country before saving
+      const schoolName = args.schoolName 
+        ? capitalizeWords(normalizeWhitespace(args.schoolName))
+        : undefined;
+      const country = args.country 
+        ? capitalizeWords(normalizeWhitespace(args.country))
+        : undefined;
+      
+      // Onboarding is complete when both schoolName and country are provided
+      const onboardingCompleted = !!(schoolName && country);
+      
       return await ctx.db.insert("userProfiles", {
         userId,
         name: args.name,
         email: args.email,
         profilePhoto: args.profilePhoto,
         googleId: args.googleId,
-        schoolName: args.schoolName,
-        country: args.country,
+        schoolName,
+        country,
         preferredLanguage: args.preferredLanguage ?? "en", // Default to English
+        onboardingCompleted,
       });
     }
   },

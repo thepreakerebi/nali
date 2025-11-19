@@ -17,6 +17,7 @@ export default defineSchema({
     schoolName: v.optional(v.string()),
     country: v.optional(v.string()),
     preferredLanguage: v.optional(v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))),
+    onboardingCompleted: v.optional(v.boolean()),
   })
     .index("by_user_id", ["userId"])
     .index("by_email", ["email"])

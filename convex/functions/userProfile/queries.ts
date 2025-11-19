@@ -23,6 +23,7 @@ export const getCurrentUserProfile = query({
       preferredLanguage: v.optional(
         v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))
       ),
+      onboardingCompleted: v.optional(v.boolean()),
     }),
     v.null()
   ),
@@ -61,6 +62,7 @@ export const getProfileByUserId = query({
       preferredLanguage: v.optional(
         v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))
       ),
+      onboardingCompleted: v.optional(v.boolean()),
     }),
     v.null()
   ),
