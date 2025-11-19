@@ -15,6 +15,7 @@ export const createOrUpdateUserProfile = mutation({
     profilePhoto: v.optional(v.string()),
     googleId: v.optional(v.string()),
     schoolName: v.optional(v.string()),
+    country: v.optional(v.string()),
     preferredLanguage: v.optional(v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))),
   },
   returns: v.id("userProfiles"),
@@ -38,6 +39,7 @@ export const createOrUpdateUserProfile = mutation({
         profilePhoto?: string;
         googleId?: string;
         schoolName?: string;
+        country?: string;
         preferredLanguage?: "en" | "fr" | "rw";
       } = {};
 
@@ -46,6 +48,7 @@ export const createOrUpdateUserProfile = mutation({
       if (args.profilePhoto !== undefined) updates.profilePhoto = args.profilePhoto;
       if (args.googleId !== undefined) updates.googleId = args.googleId;
       if (args.schoolName !== undefined) updates.schoolName = args.schoolName;
+      if (args.country !== undefined) updates.country = args.country;
       if (args.preferredLanguage !== undefined) updates.preferredLanguage = args.preferredLanguage;
 
       await ctx.db.patch(existingProfile._id, updates);
@@ -59,6 +62,7 @@ export const createOrUpdateUserProfile = mutation({
         profilePhoto: args.profilePhoto,
         googleId: args.googleId,
         schoolName: args.schoolName,
+        country: args.country,
         preferredLanguage: args.preferredLanguage ?? "en", // Default to English
       });
     }

@@ -15,6 +15,7 @@ export default defineSchema({
     profilePhoto: v.optional(v.string()),
     googleId: v.optional(v.string()),
     schoolName: v.optional(v.string()),
+    country: v.optional(v.string()),
     preferredLanguage: v.optional(v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))),
   })
     .index("by_user_id", ["userId"])

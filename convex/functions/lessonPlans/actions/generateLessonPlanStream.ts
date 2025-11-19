@@ -153,6 +153,16 @@ export const generateLessonPlanStream = action({
         return;
       }
 
+      // Get user profile to retrieve country
+      const userProfile = await ctx.runQuery(
+        api.functions.userProfile.queries.getCurrentUserProfile,
+        {}
+      );
+
+      // Use country from args if provided, otherwise from user profile, otherwise undefined
+      const country = args.country || userProfile?.country || undefined;
+      const language = args.language || userProfile?.preferredLanguage || "en";
+
       yield { type: "status", message: "Searching for similar lesson plans..." };
 
       // Search for similar plans for context
@@ -208,7 +218,7 @@ export const generateLessonPlanStream = action({
           topic: args.topic,
           subject: subjectDoc.name,
           gradeLevel: classDoc.gradeLevel,
-          country: args.country || "Rwanda",
+          country: country,
           region: args.region,
           limit: 10,
         });
@@ -297,9 +307,9 @@ export const generateLessonPlanStream = action({
         gradeLevel: classDoc.gradeLevel,
         academicYear: classDoc.academicYear,
         objectives: args.objectives,
-        country: args.country || "Rwanda",
+        country: country,
         region: args.region,
-        language: args.language || "en",
+        language: language,
         similarPlansContext,
         curriculumResources: curriculumResourcesContext,
       });

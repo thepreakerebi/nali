@@ -19,6 +19,7 @@ export const getCurrentUserProfile = query({
       profilePhoto: v.optional(v.string()),
       googleId: v.optional(v.string()),
       schoolName: v.optional(v.string()),
+      country: v.optional(v.string()),
       preferredLanguage: v.optional(
         v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))
       ),
@@ -56,6 +57,7 @@ export const getProfileByUserId = query({
       profilePhoto: v.optional(v.string()),
       googleId: v.optional(v.string()),
       schoolName: v.optional(v.string()),
+      country: v.optional(v.string()),
       preferredLanguage: v.optional(
         v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))
       ),
