@@ -177,7 +177,7 @@ export function EditClassModal({ open, onOpenChange, classId, initialData }: Edi
                 Cancel
               </Button>
               <Button variant="default-glass" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Updating..." : "Update Class"}
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

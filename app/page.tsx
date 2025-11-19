@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,7 +17,9 @@ import { SubjectListItem } from "@/app/_components/subjectListItem";
 import { AddClassModal } from "@/app/_components/addClassModal";
 import { EditClassModal } from "@/app/_components/editClassModal";
 import { DeleteClassModal } from "@/app/_components/deleteClassModal";
-import { toast } from "sonner";
+import { AddSubjectModal } from "@/app/_components/addSubjectModal";
+import { EditSubjectModal } from "@/app/_components/editSubjectModal";
+import { DeleteSubjectModal } from "@/app/_components/deleteSubjectModal";
 
 interface StatCardProps {
   title: string;
@@ -81,6 +83,14 @@ export default function Home() {
     gradeLevel: string;
     academicYear: string;
   } | null>(null);
+  const [isAddSubjectModalOpen, setIsAddSubjectModalOpen] = useState(false);
+  const [isEditSubjectModalOpen, setIsEditSubjectModalOpen] = useState(false);
+  const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<{
+    _id: Id<"subjects">;
+    name: string;
+    description?: string;
+  } | null>(null);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -92,9 +102,6 @@ export default function Home() {
   // Fetch lists
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
-  
-  // Mutations
-  const deleteSubject = useMutation(api.functions.subjects.mutations.deleteSubject);
 
   // Redirect immediately without rendering anything if onboarding not completed
   useEffect(() => {
@@ -117,8 +124,7 @@ export default function Home() {
   };
 
   const handleCreateSubject = () => {
-    // TODO: Navigate to create subject page when implemented
-    router.push("/subjects/new");
+    setIsAddSubjectModalOpen(true);
   };
 
   const handleCreateLessonPlan = () => {
@@ -146,17 +152,18 @@ export default function Home() {
   };
 
   const handleEditSubject = (id: Id<"subjects">) => {
-    // TODO: Navigate to edit subject page when implemented
-    router.push(`/subjects/${id}/edit`);
+    const subjectItem = subjects?.find((s) => s._id === id);
+    if (subjectItem) {
+      setSelectedSubject(subjectItem);
+      setIsEditSubjectModalOpen(true);
+    }
   };
 
-  const handleDeleteSubject = async (id: Id<"subjects">) => {
-    if (!confirm("Are you sure you want to delete this subject?")) return;
-    try {
-      await deleteSubject({ subjectId: id });
-      toast.success("Subject deleted");
-    } catch {
-      toast.error("Failed to delete subject");
+  const handleDeleteSubject = (id: Id<"subjects">) => {
+    const subjectItem = subjects?.find((s) => s._id === id);
+    if (subjectItem) {
+      setSelectedSubject(subjectItem);
+      setIsDeleteSubjectModalOpen(true);
     }
   };
 
@@ -197,6 +204,25 @@ export default function Home() {
         onOpenChange={setIsDeleteClassModalOpen}
         classId={selectedClass?._id || null}
         className={selectedClass?.name || null}
+      />
+      <AddSubjectModal
+        open={isAddSubjectModalOpen}
+        onOpenChange={setIsAddSubjectModalOpen}
+      />
+      <EditSubjectModal
+        open={isEditSubjectModalOpen}
+        onOpenChange={setIsEditSubjectModalOpen}
+        subjectId={selectedSubject?._id || null}
+        initialData={selectedSubject ? {
+          name: selectedSubject.name,
+          description: selectedSubject.description,
+        } : null}
+      />
+      <DeleteSubjectModal
+        open={isDeleteSubjectModalOpen}
+        onOpenChange={setIsDeleteSubjectModalOpen}
+        subjectId={selectedSubject?._id || null}
+        subjectName={selectedSubject?.name || null}
       />
       <main className="h-full w-full overflow-auto">
         <section className="flex flex-col w-full gap-4">

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -24,57 +25,67 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const classSchema = z.object({
+const subjectSchema = z.object({
   name: z
     .string()
-    .min(1, "Class name is required")
-    .min(2, "Class name must be at least 2 characters"),
-  gradeLevel: z
-    .string()
-    .min(1, "Grade level is required")
-    .min(2, "Grade level must be at least 2 characters"),
-  academicYear: z
-    .string()
-    .min(1, "Academic year is required")
-    .min(2, "Academic year must be at least 2 characters"),
+    .min(1, "Subject name is required")
+    .min(2, "Subject name must be at least 2 characters"),
+  description: z.string().optional(),
 });
 
-type ClassFormValues = z.infer<typeof classSchema>;
+type SubjectFormValues = z.infer<typeof subjectSchema>;
 
-interface AddClassModalProps {
+interface EditSubjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  subjectId: Id<"subjects"> | null;
+  initialData: {
+    name: string;
+    description?: string;
+  } | null;
 }
 
-export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
+export function EditSubjectModal({ open, onOpenChange, subjectId, initialData }: EditSubjectModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const createClass = useMutation(api.functions.classes.mutations.createClass);
+  const updateSubject = useMutation(api.functions.subjects.mutations.updateSubject);
 
-  const form = useForm<ClassFormValues>({
-    resolver: zodResolver(classSchema),
+  const form = useForm<SubjectFormValues>({
+    resolver: zodResolver(subjectSchema),
     defaultValues: {
       name: "",
-      gradeLevel: "",
-      academicYear: "",
+      description: "",
     },
   });
 
-  const onSubmit = async (values: ClassFormValues) => {
+  // Pre-fill form when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        name: initialData.name,
+        description: initialData.description || "",
+      });
+    }
+  }, [initialData, form]);
+
+  const onSubmit = async (values: SubjectFormValues) => {
+    if (!subjectId) return;
+
     setIsSubmitting(true);
     try {
-      await createClass({
+      await updateSubject({
+        subjectId,
         name: values.name,
-        gradeLevel: values.gradeLevel,
-        academicYear: values.academicYear,
+        description: values.description || undefined,
       });
-      toast.success("Class created successfully");
+      toast.success("Subject updated successfully");
       form.reset();
       onOpenChange(false);
-    } catch (error) {
-      toast.error("Failed to create class. Please try again.");
+    } catch {
+      toast.error("Failed to update subject. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -91,9 +102,9 @@ export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Class</DialogTitle>
+          <DialogTitle>Edit Subject</DialogTitle>
           <DialogDescription>
-            Add a class by filling in the details below.
+            Update the subject details below.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -103,9 +114,9 @@ export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Class Name</FormLabel>
+                  <FormLabel>Subject Name</FormLabel>
                   <FormDescription>
-                    Enter a descriptive name for your class (e.g., Grade 5A or Mathematics Class)
+                    Enter the name of the subject (e.g., Mathematics, Science, English)
                   </FormDescription>
                   <FormControl>
                     <Input {...field} />
@@ -116,31 +127,19 @@ export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
             />
             <FormField
               control={form.control}
-              name="gradeLevel"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Grade Level</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormDescription>
-                    Specify the grade or level of the class (e.g., Grade 5 or Primary 3)
+                    Optionally provide a description for this subject
                   </FormDescription>
                   <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="academicYear"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Academic Year</FormLabel>
-                  <FormDescription>
-                    Enter the academic year for this class (e.g., 2024-2025 or 2024)
-                  </FormDescription>
-                  <FormControl>
-                    <Input {...field} />
+                    <Textarea
+                      className="resize-none"
+                      rows={3}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,7 +155,7 @@ export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
                 Cancel
               </Button>
               <Button variant="default-glass" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add Class"}
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>
