@@ -295,9 +295,9 @@ function AppSidebarContent() {
             </Button>
           </header>
           <SidebarGroupContent className="px-2 mt-3">
-            {/* Search */}
-            <section className="mb-2">
-              <section className="relative">
+            {/* Search and Filter */}
+            <section className="flex items-center gap-2 mb-2">
+              <section className="relative flex-1">
                 <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search notes..."
@@ -307,6 +307,59 @@ function AppSidebarContent() {
                   aria-label="Search lesson notes"
                 />
               </section>
+              {isMounted ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <FilterIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedClassId(undefined);
+                        setSelectedSubjectId(undefined);
+                      }}
+                    >
+                      All Classes & Subjects
+                    </DropdownMenuItem>
+                    {classes && classes.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {classes.map((classItem) => (
+                          <DropdownMenuItem
+                            key={classItem._id}
+                            onClick={() => {
+                              setSelectedClassId(classItem._id);
+                              setSelectedSubjectId(undefined);
+                            }}
+                          >
+                            {classItem.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    {subjects && subjects.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {subjects.map((subject) => (
+                          <DropdownMenuItem
+                            key={subject._id}
+                            onClick={() => {
+                              setSelectedSubjectId(subject._id);
+                              setSelectedClassId(undefined);
+                            }}
+                          >
+                            {subject.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="h-8 w-8" />
+              )}
             </section>
 
             {/* Lesson Notes List */}
