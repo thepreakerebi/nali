@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Spinner } from "@/components/ui/spinner";
 import { GraduationCap, BookOpen, FileText, StickyNote, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -173,8 +172,47 @@ export default function Home() {
   // This prevents the flash of home page content
   if (userProfile === undefined) {
     return (
-      <main className="min-h-screen w-full flex items-center justify-center">
-        <Spinner className="size-8" />
+      <main className="h-full w-full overflow-auto">
+        <section className="flex flex-col w-full gap-4">
+          {/* Stats Cards Section Skeleton */}
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="flex flex-col gap-0 p-2">
+                <header className="flex items-center justify-between gap-2 p-2">
+                  <section className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-16" />
+                  </section>
+                  <Skeleton className="h-6 w-6 rounded-md" />
+                </header>
+                <section className="px-2 py-2 bg-white rounded-2xl">
+                  <Skeleton className="h-8 w-16" />
+                </section>
+              </Card>
+            ))}
+          </section>
+
+          {/* Tabs Section Skeleton */}
+          <section className="flex flex-col w-full gap-4">
+            <Skeleton className="h-10 w-full" />
+            <section className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <article key={i} className="rounded-lg border p-4">
+                  <section className="space-y-3">
+                    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <section key={j} className="space-y-1">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-4 w-32" />
+                        </section>
+                      ))}
+                    </section>
+                  </section>
+                </article>
+              ))}
+            </section>
+          </section>
+        </section>
       </main>
     );
   }
@@ -268,10 +306,28 @@ export default function Home() {
             </TabsList>
             <TabsContent value="classes" className="mt-4">
               {classes === undefined ? (
-                <section className="space-y-2">
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </section>
+                <nav className="space-y-2" aria-label="Classes list loading">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <article key={i} className="rounded-lg border p-4">
+                      <section className="space-y-3">
+                        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-24" />
+                            <Skeleton className="h-4 w-32" />
+                          </section>
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-20" />
+                            <Skeleton className="h-4 w-28" />
+                          </section>
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-28" />
+                            <Skeleton className="h-4 w-24" />
+                          </section>
+                        </section>
+                      </section>
+                    </article>
+                  ))}
+                </nav>
               ) : classes.length === 0 ? (
                 <Empty>
                   <EmptyMedia variant="icon">
@@ -302,10 +358,28 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="subjects" className="mt-4">
               {subjects === undefined ? (
-                <section className="space-y-2">
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </section>
+                <nav className="space-y-2" aria-label="Subjects list loading">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <article key={i} className="rounded-lg border p-4">
+                      <section className="space-y-3">
+                        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-4 w-32" />
+                          </section>
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-24" />
+                            <Skeleton className="h-4 w-36" />
+                          </section>
+                          <section className="space-y-1">
+                            <Skeleton className="h-3 w-28" />
+                            <Skeleton className="h-4 w-full" />
+                          </section>
+                        </section>
+                      </section>
+                    </article>
+                  ))}
+                </nav>
               ) : subjects.length === 0 ? (
                 <Empty>
                   <EmptyMedia variant="icon">
