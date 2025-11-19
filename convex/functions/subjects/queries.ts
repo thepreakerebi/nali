@@ -26,6 +26,7 @@ export const listSubjects = query({
     return await ctx.db
       .query("subjects")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .order("desc")
       .collect();
   },
 });
