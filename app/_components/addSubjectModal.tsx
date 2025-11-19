@@ -41,9 +41,10 @@ type SubjectFormValues = z.infer<typeof subjectSchema>;
 interface AddSubjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export function AddSubjectModal({ open, onOpenChange }: AddSubjectModalProps) {
+export function AddSubjectModal({ open, onOpenChange, onSuccess }: AddSubjectModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createSubject = useMutation(api.functions.subjects.mutations.createSubject);
 
@@ -65,6 +66,8 @@ export function AddSubjectModal({ open, onOpenChange }: AddSubjectModalProps) {
       toast.success("Subject created successfully");
       form.reset();
       onOpenChange(false);
+      // Switch to subjects tab after successful creation
+      onSuccess?.();
     } catch {
       toast.error("Failed to create subject. Please try again.");
     } finally {

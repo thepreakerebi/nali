@@ -47,9 +47,10 @@ type ClassFormValues = z.infer<typeof classSchema>;
 interface AddClassModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
+export function AddClassModal({ open, onOpenChange, onSuccess }: AddClassModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createClass = useMutation(api.functions.classes.mutations.createClass);
 
@@ -73,7 +74,9 @@ export function AddClassModal({ open, onOpenChange }: AddClassModalProps) {
       toast.success("Class created successfully");
       form.reset();
       onOpenChange(false);
-    } catch (error) {
+      // Switch to classes tab after successful creation
+      onSuccess?.();
+    } catch {
       toast.error("Failed to create class. Please try again.");
     } finally {
       setIsSubmitting(false);

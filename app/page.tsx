@@ -91,6 +91,7 @@ export default function Home() {
     name: string;
     description?: string;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"classes" | "subjects">("classes");
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -188,6 +189,7 @@ export default function Home() {
       <AddClassModal
         open={isAddClassModalOpen}
         onOpenChange={setIsAddClassModalOpen}
+        onSuccess={() => setActiveTab("classes")}
       />
       <EditClassModal
         open={isEditClassModalOpen}
@@ -208,6 +210,7 @@ export default function Home() {
       <AddSubjectModal
         open={isAddSubjectModalOpen}
         onOpenChange={setIsAddSubjectModalOpen}
+        onSuccess={() => setActiveTab("subjects")}
       />
       <EditSubjectModal
         open={isEditSubjectModalOpen}
@@ -256,7 +259,7 @@ export default function Home() {
 
         {/* Second Section - Classes and Subjects Tabs */}
         <section className="flex flex-col w-full gap-4">
-          <Tabs defaultValue="classes" className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "classes" | "subjects")} className="w-full">
             <TabsList className="sticky top-0 z-10 bg-background border-b -mx-4">
               <TabsTrigger value="classes">Classes</TabsTrigger>
               <TabsTrigger value="subjects">Subjects</TabsTrigger>
