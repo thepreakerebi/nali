@@ -78,7 +78,7 @@ export function DeleteClassModal({ open, onOpenChange, classId, className }: Del
         </DialogHeader>
         <section className="space-y-2">
           <section className="flex items-center gap-2 text-sm text-muted-foreground">
-            <p>Type</p>
+            <span>Type</span>
             <code className="relative rounded bg-muted px-2 py-1 font-mono text-sm font-semibold">
               {className}
             </code>
@@ -96,7 +96,7 @@ export function DeleteClassModal({ open, onOpenChange, classId, className }: Del
                 <Copy className="h-3.5 w-3.5" />
               )}
             </Button>
-            <p>to delete class</p>
+            <span>to delete class</span>
           </section>
           <Input
             type="text"

@@ -5,6 +5,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 /**
  * List all subjects for the current authenticated user
  * Returns empty array if not authenticated
+ * Includes class name for each subject
  */
 export const listSubjects = query({
   args: {},
@@ -14,6 +15,7 @@ export const listSubjects = query({
       _creationTime: v.number(),
       userId: v.id("users"),
       classId: v.id("classes"),
+      className: v.string(),
       name: v.string(),
       description: v.optional(v.string()),
     })
@@ -24,11 +26,49 @@ export const listSubjects = query({
       return [];
     }
 
-    return await ctx.db
+    const subjects = await ctx.db
       .query("subjects")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
+
+    // Fetch class names for all subjects
+    const subjectsWithClassNames = await Promise.all(
+      subjects.map(async (subject) => {
+        try {
+          const classDoc = await ctx.db.get(subject.classId);
+          if (!classDoc) {
+            console.error(`[listSubjects] Class not found for subject ${subject._id}, classId: ${subject.classId}`);
+            return {
+              ...subject,
+              className: "",
+            };
+          }
+          
+          // Get the class name - ensure it exists and is a string
+          const className = classDoc.name 
+            ? String(classDoc.name).trim() 
+            : "";
+          
+          if (!className) {
+            console.warn(`[listSubjects] Class ${subject.classId} has empty name for subject ${subject._id}`);
+          }
+          
+          return {
+            ...subject,
+            className: className,
+          };
+        } catch (error) {
+          console.error(`[listSubjects] Error fetching class for subject ${subject._id}, classId: ${subject.classId}:`, error);
+          return {
+            ...subject,
+            className: "",
+          };
+        }
+      })
+    );
+
+    return subjectsWithClassNames;
   },
 });
 

@@ -78,7 +78,7 @@ export function DeleteSubjectModal({ open, onOpenChange, subjectId, subjectName 
         </DialogHeader>
         <section className="space-y-2">
           <section className="flex items-center gap-2 text-sm text-muted-foreground">
-            <p>Type</p>
+            <span>Type</span>
             <code className="relative rounded bg-muted px-2 py-1 font-mono text-sm font-semibold">
               {subjectName}
             </code>
@@ -96,7 +96,7 @@ export function DeleteSubjectModal({ open, onOpenChange, subjectId, subjectName 
                 <Copy className="h-3.5 w-3.5" />
               )}
             </Button>
-            <p>to delete subject</p>
+            <span>to delete subject</span>
           </section>
           <Input
             type="text"

@@ -28,12 +28,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
 import { toast } from "sonner";
 
 const subjectSchema = z.object({
@@ -115,27 +112,29 @@ export function AddSubjectModal({ open, onOpenChange, onSuccess }: AddSubjectMod
                     Select the class this subject belongs to
                   </FormDescription>
                   <FormControl>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a class..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes === undefined ? (
-                          <SelectItem value="loading" disabled>Loading classes...</SelectItem>
-                        ) : classes.length === 0 ? (
-                          <SelectItem value="empty" disabled>No classes available</SelectItem>
-                        ) : (
-                          classes.map((classItem) => (
-                            <SelectItem key={classItem._id} value={classItem._id}>
+                    {classes === undefined ? (
+                      <div className="text-sm text-muted-foreground">Loading classes...</div>
+                    ) : classes.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No classes available. Please create a class first.</div>
+                    ) : (
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="space-y-2"
+                      >
+                        {classes.map((classItem) => (
+                          <div key={classItem._id} className="flex items-center space-x-2">
+                            <RadioGroupItem value={classItem._id} id={`class-${classItem._id}`} />
+                            <label
+                              htmlFor={`class-${classItem._id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            >
                               {classItem.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                            </label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
