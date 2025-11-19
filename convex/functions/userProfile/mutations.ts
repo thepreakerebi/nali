@@ -6,6 +6,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
  * Create or update user profile after Google OAuth sign-in
  * Requires authentication - this should be called after successful Google OAuth authentication
  * Users can only create/update their own profile
+ * Default language is set to English ("en") for new profiles
  */
 export const createOrUpdateUserProfile = mutation({
   args: {
@@ -14,6 +15,7 @@ export const createOrUpdateUserProfile = mutation({
     profilePhoto: v.optional(v.string()),
     googleId: v.optional(v.string()),
     schoolName: v.optional(v.string()),
+    preferredLanguage: v.optional(v.union(v.literal("en"), v.literal("fr"), v.literal("rw"))),
   },
   returns: v.id("userProfiles"),
   handler: async (ctx, args) => {
@@ -36,6 +38,7 @@ export const createOrUpdateUserProfile = mutation({
         profilePhoto?: string;
         googleId?: string;
         schoolName?: string;
+        preferredLanguage?: "en" | "fr" | "rw";
       } = {};
 
       if (args.name !== undefined) updates.name = args.name;
@@ -43,11 +46,12 @@ export const createOrUpdateUserProfile = mutation({
       if (args.profilePhoto !== undefined) updates.profilePhoto = args.profilePhoto;
       if (args.googleId !== undefined) updates.googleId = args.googleId;
       if (args.schoolName !== undefined) updates.schoolName = args.schoolName;
+      if (args.preferredLanguage !== undefined) updates.preferredLanguage = args.preferredLanguage;
 
       await ctx.db.patch(existingProfile._id, updates);
       return existingProfile._id;
     } else {
-      // Create new profile
+      // Create new profile with default language set to English
       return await ctx.db.insert("userProfiles", {
         userId,
         name: args.name,
@@ -55,6 +59,7 @@ export const createOrUpdateUserProfile = mutation({
         profilePhoto: args.profilePhoto,
         googleId: args.googleId,
         schoolName: args.schoolName,
+        preferredLanguage: args.preferredLanguage ?? "en", // Default to English
       });
     }
   },
@@ -63,12 +68,14 @@ export const createOrUpdateUserProfile = mutation({
 /**
  * Update user preferred language
  * Requires authentication - users can only update their own language preference
+ * Supported languages: "en" (English), "fr" (French), "rw" (Kinyarwanda)
+ * Returns the updated preferred language
  */
 export const updatePreferredLanguage = mutation({
   args: {
     preferredLanguage: v.union(v.literal("en"), v.literal("fr"), v.literal("rw")),
   },
-  returns: v.null(),
+  returns: v.union(v.literal("en"), v.literal("fr"), v.literal("rw")),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) {
@@ -88,39 +95,8 @@ export const updatePreferredLanguage = mutation({
       preferredLanguage: args.preferredLanguage,
     });
 
-    return null;
+    return args.preferredLanguage;
   },
 });
 
-/**
- * Update school name
- * Requires authentication - users can only update their own school name
- */
-export const updateSchoolName = mutation({
-  args: {
-    schoolName: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null) {
-      throw new Error("Authentication required");
-    }
-
-    const profile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
-
-    if (!profile) {
-      throw new Error("User profile not found. Please create your profile first.");
-    }
-
-    await ctx.db.patch(profile._id, {
-      schoolName: args.schoolName,
-    });
-
-    return null;
-  },
-});
 

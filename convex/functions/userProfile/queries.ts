@@ -81,3 +81,31 @@ export const getProfileByUserId = query({
   },
 });
 
+/**
+ * Get the current user's preferred language
+ * Returns null if not authenticated, profile doesn't exist, or language is not set
+ * Returns the preferred language code ("en", "fr", or "rw") if set
+ */
+export const getPreferredLanguage = query({
+  args: {},
+  returns: v.union(
+    v.literal("en"),
+    v.literal("fr"),
+    v.literal("rw"),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return null;
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    return profile?.preferredLanguage ?? null;
+  },
+});
+
