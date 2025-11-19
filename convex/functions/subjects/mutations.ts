@@ -1,6 +1,7 @@
 import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { Id } from "../../_generated/dataModel";
 import {
   createAuthError,
   createNotFoundError,
@@ -16,6 +17,7 @@ import { toTitleCase } from "../utils/string";
  */
 export const createSubject = mutation({
   args: {
+    classId: v.id("classes"),
     name: v.string(),
     description: v.optional(v.string()),
   },
@@ -35,9 +37,24 @@ export const createSubject = mutation({
       );
     }
 
+    // Verify class exists and user owns it
+    const classDoc = await ctx.db.get(args.classId);
+    if (!classDoc) {
+      throw createNotFoundError(
+        "class",
+        args.classId,
+        "The class may have been deleted or you may have the wrong ID. Please refresh the page."
+      );
+    }
+
+    if (classDoc.userId !== userId) {
+      throw createAuthorizationError("class", "use");
+    }
+
     try {
       return await ctx.db.insert("subjects", {
         userId,
+        classId: args.classId,
         name: toTitleCase(args.name.trim()),
         description: args.description?.trim(),
       });
@@ -59,6 +76,7 @@ export const createSubject = mutation({
 export const updateSubject = mutation({
   args: {
     subjectId: v.id("subjects"),
+    classId: v.optional(v.id("classes")),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
   },
@@ -94,11 +112,29 @@ export const updateSubject = mutation({
       }
     }
 
+    // If classId is being updated, verify the new class exists and user owns it
+    if (args.classId !== undefined) {
+      const classDoc = await ctx.db.get(args.classId);
+      if (!classDoc) {
+        throw createNotFoundError(
+          "class",
+          args.classId,
+          "The class may have been deleted or you may have the wrong ID. Please refresh the page."
+        );
+      }
+
+      if (classDoc.userId !== userId) {
+        throw createAuthorizationError("class", "use");
+      }
+    }
+
     const updates: {
+      classId?: Id<"classes">;
       name?: string;
       description?: string;
     } = {};
 
+    if (args.classId !== undefined) updates.classId = args.classId;
     if (args.name !== undefined) updates.name = toTitleCase(args.name.trim());
     if (args.description !== undefined) updates.description = args.description.trim();
 

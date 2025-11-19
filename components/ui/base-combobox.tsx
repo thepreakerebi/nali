@@ -106,7 +106,13 @@ function ComboboxPortal({ ...props }: React.ComponentProps<typeof ComboboxPrimit
 
 // Backdrop - An overlay displayed beneath the combobox popup
 function ComboboxBackdrop({ ...props }: React.ComponentProps<typeof ComboboxPrimitive.Backdrop>) {
-  return <ComboboxPrimitive.Backdrop data-slot="combobox-backdrop" {...props} />;
+  return (
+    <ComboboxPrimitive.Backdrop
+      data-slot="combobox-backdrop"
+      className="z-[99]"
+      {...props}
+    />
+  );
 }
 
 function ComboboxContent({
@@ -144,7 +150,7 @@ function ComboboxPositioner({ className, ...props }: React.ComponentProps<typeof
   return (
     <ComboboxPrimitive.Positioner
       data-slot="combobox-positioner"
-      className={cn('z-50 outline-none', className)}
+      className={cn('z-[60] outline-none', className)}
       {...props}
     />
   );
@@ -161,6 +167,7 @@ function ComboboxPopup({ className, ...props }: React.ComponentProps<typeof Comb
         'rounded-md border border-border bg-popover text-popover-foreground shadow-md shadow-black/5',
         'origin-[var(--transform-origin)] transition-[transform,scale,opacity] data-[ending-style]:scale-90',
         'data-[ending-style]:opacity-0 data-[starting-style]:scale-90 data-[starting-style]:opacity-0',
+        'z-[100]',
         className,
       )}
       {...props}
@@ -191,10 +198,12 @@ function ComboboxItem({ className, ...props }: React.ComponentProps<typeof Combo
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        'relative cursor-default flex items-center',
-        'text-foreground relative select-none items-center gap-2 rounded-md ps-7 pe-2 py-1.5 text-sm outline-hidden transition-colors data-disabled:pointer-events-none data-disabled:opacity-50',
+        'relative cursor-pointer flex items-center',
+        'text-foreground select-none items-center gap-2 rounded-md ps-7 pe-2 py-1.5 text-sm outline-none transition-colors data-disabled:pointer-events-none data-disabled:opacity-50',
         '[&_svg]:pointer-events-none [&_svg:not([role=img]):not([class*=text-])]:opacity-60 [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0',
-        'data-[highlighted]:relative data-[highlighted]:z-0 data-[highlighted]:text-foreground data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:rounded-sm data-[highlighted]:before:bg-accent',
+        'hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
+        'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
+        'data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
         className,
       )}
       {...props}

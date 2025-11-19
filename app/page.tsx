@@ -88,6 +88,7 @@ export default function Home() {
   const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<{
     _id: Id<"subjects">;
+    classId: Id<"classes">;
     name: string;
     description?: string;
   } | null>(null);
@@ -217,6 +218,7 @@ export default function Home() {
         onOpenChange={setIsEditSubjectModalOpen}
         subjectId={selectedSubject?._id || null}
         initialData={selectedSubject ? {
+          classId: selectedSubject.classId,
           name: selectedSubject.name,
           description: selectedSubject.description,
         } : null}

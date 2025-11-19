@@ -47,7 +47,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
             <h1 className="text-xl font-semibold text-foreground">{getPageTitle()}</h1>
           </header>
-          <main className="flex-1 p-4">{children}</main>
+          <main className="flex-1 p-4 overflow-y-auto">{children}</main>
         </SidebarInset>
       </section>
     </SidebarProvider>

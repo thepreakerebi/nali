@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -27,9 +27,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 const subjectSchema = z.object({
+  classId: z.string().min(1, "Class is required"),
   name: z
     .string()
     .min(1, "Subject name is required")
@@ -44,6 +52,7 @@ interface EditSubjectModalProps {
   onOpenChange: (open: boolean) => void;
   subjectId: Id<"subjects"> | null;
   initialData: {
+    classId: Id<"classes">;
     name: string;
     description?: string;
   } | null;
@@ -52,10 +61,12 @@ interface EditSubjectModalProps {
 export function EditSubjectModal({ open, onOpenChange, subjectId, initialData }: EditSubjectModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const updateSubject = useMutation(api.functions.subjects.mutations.updateSubject);
+  const classes = useQuery(api.functions.classes.queries.listClasses, {});
 
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
     defaultValues: {
+      classId: "",
       name: "",
       description: "",
     },
@@ -65,6 +76,7 @@ export function EditSubjectModal({ open, onOpenChange, subjectId, initialData }:
   useEffect(() => {
     if (initialData) {
       form.reset({
+        classId: initialData.classId,
         name: initialData.name,
         description: initialData.description || "",
       });
@@ -78,6 +90,7 @@ export function EditSubjectModal({ open, onOpenChange, subjectId, initialData }:
     try {
       await updateSubject({
         subjectId,
+        classId: values.classId as Id<"classes">,
         name: values.name,
         description: values.description || undefined,
       });
@@ -109,6 +122,42 @@ export function EditSubjectModal({ open, onOpenChange, subjectId, initialData }:
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="classId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Class</FormLabel>
+                  <FormDescription>
+                    Select the class this subject belongs to
+                  </FormDescription>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a class..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes === undefined ? (
+                          <SelectItem value="loading" disabled>Loading classes...</SelectItem>
+                        ) : classes.length === 0 ? (
+                          <SelectItem value="empty" disabled>No classes available</SelectItem>
+                        ) : (
+                          classes.map((classItem) => (
+                            <SelectItem key={classItem._id} value={classItem._id}>
+                              {classItem.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="name"

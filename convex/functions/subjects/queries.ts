@@ -13,6 +13,7 @@ export const listSubjects = query({
       _id: v.id("subjects"),
       _creationTime: v.number(),
       userId: v.id("users"),
+      classId: v.id("classes"),
       name: v.string(),
       description: v.optional(v.string()),
     })
@@ -66,6 +67,7 @@ export const getSubject = query({
       _id: v.id("subjects"),
       _creationTime: v.number(),
       userId: v.id("users"),
+      classId: v.id("classes"),
       name: v.string(),
       description: v.optional(v.string()),
     }),

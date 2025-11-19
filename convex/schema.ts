@@ -34,9 +34,13 @@ export default defineSchema({
 
   subjects: defineTable({
     userId: v.id("users"), // References auth user from authTables
+    classId: v.id("classes"), // References the class this subject belongs to
     name: v.string(),
     description: v.optional(v.string()),
-  }).index("by_user_id", ["userId"]),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_class_id", ["classId"])
+    .index("by_user_id_and_class_id", ["userId", "classId"]),
 
   lessonPlans: defineTable({
     userId: v.id("users"), // References auth user from authTables

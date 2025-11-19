@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import { Pencil, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface SubjectListItemProps {
   subject: {
     _id: Id<"subjects">;
+    classId: Id<"classes">;
     name: string;
     description?: string;
   };
@@ -17,6 +20,11 @@ interface SubjectListItemProps {
 
 export function SubjectListItem({ subject, onEdit, onDelete }: SubjectListItemProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const classData = useQuery(api.functions.classes.queries.getClass, { classId: subject.classId });
+  
+  const className = useMemo(() => {
+    return classData?.name || "Loading...";
+  }, [classData]);
 
   return (
     <article
@@ -25,18 +33,22 @@ export function SubjectListItem({ subject, onEdit, onDelete }: SubjectListItemPr
       onMouseLeave={() => setIsHovered(false)}
     >
       <section className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <section className="space-y-1">
+            <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Class</dt>
+            <dd className="text-sm font-medium text-foreground">{className}</dd>
+          </section>
           <section className="space-y-1">
             <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subject Name</dt>
             <dd className="text-sm font-medium text-foreground">{subject.name}</dd>
           </section>
           {subject.description && (
-            <section className="space-y-1 sm:col-span-2">
+            <section className="space-y-1">
               <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</dt>
               <dd className="text-sm text-foreground line-clamp-2">{subject.description}</dd>
             </section>
           )}
-        </div>
+        </section>
       </section>
       {isHovered && (
         <nav 
