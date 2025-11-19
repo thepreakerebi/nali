@@ -36,6 +36,7 @@ export const getCurrentUserProfile = query({
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
+    
     return profile ?? null;
   },
 });

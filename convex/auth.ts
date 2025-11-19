@@ -33,6 +33,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // Get Google account data from callback args
       const email = args.profile?.email ?? undefined;
       const name = args.profile?.name ?? undefined;
+      // profilePhoto comes from args.profile?.image in Google OAuth
       const profilePhoto = args.profile?.image ?? undefined;
       const googleId = args.account?.providerAccountId ?? undefined;
 
@@ -43,11 +44,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             userId,
             name,
             email,
-            profilePhoto,
+            profilePhoto: profilePhoto || undefined, // Explicitly set even if undefined
             googleId,
             preferredLanguage: "en", // Default to English
             onboardingCompleted: false, // Will be set to true when schoolName and country are provided
           });
+          console.log("Created user profile with profilePhoto:", profilePhoto ? "yes" : "no");
         } catch (error) {
           console.error("Error creating user profile in callback:", error);
           // Don't throw - allow sign-in to continue even if profile creation fails
@@ -68,8 +70,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (email && email !== existingProfile.email) {
           updates.email = email;
         }
-        if (profilePhoto && profilePhoto !== existingProfile.profilePhoto) {
-          updates.profilePhoto = profilePhoto;
+        // Always update profilePhoto if provided from Google
+        // This ensures existing users get their profile photo set
+        if (profilePhoto) {
+          // Update if different or if existing doesn't have one
+          if (profilePhoto !== existingProfile.profilePhoto) {
+            updates.profilePhoto = profilePhoto;
+          }
         }
         if (googleId && googleId !== existingProfile.googleId) {
           updates.googleId = googleId;
@@ -78,6 +85,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (Object.keys(updates).length > 0) {
           try {
             await ctx.db.patch(existingProfile._id, updates);
+            console.log("Updated user profile with profilePhoto:", updates.profilePhoto ? "yes" : "no");
           } catch (error) {
             console.error("Error updating user profile in callback:", error);
           }

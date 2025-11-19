@@ -6,6 +6,8 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import IntlClientProvider from "@/components/IntlClientProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { LayoutWrapper } from "@/app/_components/layoutWrapper";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { getDictionary } from "@/lib/get-dictionary";
 import { defaultLocale, localeCookieName, locales, type Locale } from "@/i18n.config";
 
@@ -49,7 +51,9 @@ export default async function RootLayout({
         <body className={`${rethinkSans.variable} antialiased`} suppressHydrationWarning={true}>
           <ConvexClientProvider>
             <IntlClientProvider locale={locale} messages={messages}>
-              {children}
+              <SidebarProvider>
+                <LayoutWrapper>{children}</LayoutWrapper>
+              </SidebarProvider>
               <Toaster />
             </IntlClientProvider>
           </ConvexClientProvider>
