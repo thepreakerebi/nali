@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { LessonPlanItem } from "./lessonPlanItem";
 import { LessonNoteItem } from "./lessonNoteItem";
 import { UserDropdown } from "./userDropdown";
@@ -149,9 +150,9 @@ function AppSidebarContent() {
                   isActive={isHomeActive}
                   tooltip={isMounted ? "Home" : undefined}
                   onClick={() => router.push("/")}
-                  className="font-bold"
+                  className={isHomeActive ? "font-bold" : ""}
                 >
-                  <HomeIcon className="size-5" />
+                  <HomeIcon className={cn("size-4", isHomeActive && "stroke-3")} />
                   Home
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -258,15 +259,19 @@ function AppSidebarContent() {
                 </p>
               ) : (
                 <ul className="space-y-1" role="list">
-                  {filteredLessonPlans.map((plan) => (
-                    <li key={plan._id}>
-                      <LessonPlanItem
-                        plan={plan}
-                        onEdit={handleEditLessonPlan}
-                        onDelete={handleDeleteLessonPlan}
-                      />
-                    </li>
-                  ))}
+                  {filteredLessonPlans.map((plan) => {
+                    const isActive = pathname === `/lesson-plans/${plan._id}`;
+                    return (
+                      <li key={plan._id}>
+                        <LessonPlanItem
+                          plan={plan}
+                          isActive={isActive}
+                          onEdit={handleEditLessonPlan}
+                          onDelete={handleDeleteLessonPlan}
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </nav>
@@ -317,14 +322,18 @@ function AppSidebarContent() {
                 </p>
               ) : (
                 <ul className="space-y-1" role="list">
-                  {filteredLessonNotes.map((note) => (
-                    <li key={note._id}>
-                      <LessonNoteItem
-                        note={note}
-                        onDelete={handleDeleteLessonNote}
-                      />
-                    </li>
-                  ))}
+                  {filteredLessonNotes.map((note) => {
+                    const isActive = pathname === `/lesson-notes/${note._id}`;
+                    return (
+                      <li key={note._id}>
+                        <LessonNoteItem
+                          note={note}
+                          isActive={isActive}
+                          onDelete={handleDeleteLessonNote}
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </nav>

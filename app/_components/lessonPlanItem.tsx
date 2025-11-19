@@ -4,26 +4,33 @@ import { useState } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import { Pencil, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface LessonPlanItemProps {
   plan: {
     _id: Id<"lessonPlans">;
     title: string;
   };
+  isActive?: boolean;
   onEdit: (id: Id<"lessonPlans">) => void;
   onDelete: (id: Id<"lessonPlans">) => void;
 }
 
-export function LessonPlanItem({ plan, onEdit, onDelete }: LessonPlanItemProps) {
+export function LessonPlanItem({ plan, isActive = false, onEdit, onDelete }: LessonPlanItemProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <article
-      className="group relative flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent transition-colors"
+      className={cn(
+        "group relative flex items-center gap-2 rounded-md px-2 py-2 transition-colors",
+        isActive
+          ? "bg-sidebar-accent font-bold text-sidebar-accent-foreground"
+          : "hover:bg-sidebar-accent text-sidebar-foreground"
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <p className="flex-1 truncate text-sm text-sidebar-foreground">
+      <p className={cn("flex-1 truncate text-sm", isActive && "font-bold")}>
         {plan.title}
       </p>
       {isHovered && (
