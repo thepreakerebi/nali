@@ -146,21 +146,42 @@ export const deleteSubject = mutation({
       throw createAuthorizationError("subject", "delete");
     }
 
-    // Check if there are any lesson plans using this subject
-    const lessonPlans = await ctx.db
-      .query("lessonPlans")
-      .withIndex("by_subject_id", (q) => q.eq("subjectId", args.subjectId))
-      .first();
-
-    if (lessonPlans) {
-      throw createDependencyError(
-        "subject",
-        "lesson plans",
-        "delete"
-      );
-    }
-
     try {
+      // Delete all lesson plans for this subject (which will cascade delete lesson notes)
+      const lessonPlans = await ctx.db
+        .query("lessonPlans")
+        .withIndex("by_subject_id", (q) => q.eq("subjectId", args.subjectId))
+        .collect();
+
+      for (const plan of lessonPlans) {
+        // Verify ownership before deleting (safety check)
+        if (plan.userId === userId) {
+          // Delete all lesson notes for this lesson plan
+          const lessonNotes = await ctx.db
+            .query("lessonNotes")
+            .withIndex("by_lesson_plan_id", (q) => q.eq("lessonPlanId", plan._id))
+            .collect();
+
+          for (const note of lessonNotes) {
+            if (note.userId === userId) {
+              try {
+                await ctx.db.delete(note._id);
+              } catch (noteError) {
+                console.error(`Error deleting lesson note ${note._id}:`, noteError);
+              }
+            }
+          }
+
+          // Delete the lesson plan
+          try {
+            await ctx.db.delete(plan._id);
+          } catch (planError) {
+            console.error(`Error deleting lesson plan ${plan._id}:`, planError);
+          }
+        }
+      }
+
+      // Finally, delete the subject
       await ctx.db.delete(args.subjectId);
       return null;
     } catch (error) {

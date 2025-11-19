@@ -1,11 +1,11 @@
 import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
+import { Id } from "../../_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   createAuthError,
   createNotFoundError,
   createAuthorizationError,
-  createDependencyError,
   createValidationError,
 } from "../utils/errors";
 import { toTitleCase } from "../utils/string";
@@ -183,21 +183,74 @@ export const deleteClass = mutation({
       throw createAuthorizationError("class", "delete");
     }
 
-    // Check if there are any lesson plans using this class
-    const lessonPlans = await ctx.db
-      .query("lessonPlans")
-      .withIndex("by_class_id", (q) => q.eq("classId", args.classId))
-      .first();
-
-    if (lessonPlans) {
-      throw createDependencyError(
-        "class",
-        "lesson plans",
-        "delete"
-      );
-    }
-
     try {
+      // Delete all lesson plans for this class (which will cascade delete lesson notes)
+      const lessonPlans = await ctx.db
+        .query("lessonPlans")
+        .withIndex("by_class_id", (q) => q.eq("classId", args.classId))
+        .collect();
+
+      for (const plan of lessonPlans) {
+        // Verify ownership before deleting (safety check)
+        if (plan.userId === userId) {
+          // Delete all lesson notes for this lesson plan
+          const lessonNotes = await ctx.db
+            .query("lessonNotes")
+            .withIndex("by_lesson_plan_id", (q) => q.eq("lessonPlanId", plan._id))
+            .collect();
+
+          for (const note of lessonNotes) {
+            if (note.userId === userId) {
+              try {
+                await ctx.db.delete(note._id);
+              } catch (noteError) {
+                console.error(`Error deleting lesson note ${note._id}:`, noteError);
+              }
+            }
+          }
+
+          // Delete the lesson plan
+          try {
+            await ctx.db.delete(plan._id);
+          } catch (planError) {
+            console.error(`Error deleting lesson plan ${plan._id}:`, planError);
+          }
+        }
+      }
+
+      // Delete subjects that are only used by lesson plans for this class
+      const subjectsUsedByThisClass = new Set<Id<"subjects">>();
+      for (const plan of lessonPlans) {
+        if (plan.userId === userId) {
+          subjectsUsedByThisClass.add(plan.subjectId);
+        }
+      }
+
+      // Check each subject to see if it's used by other classes' lesson plans
+      for (const subjectId of subjectsUsedByThisClass) {
+        const otherLessonPlans = await ctx.db
+          .query("lessonPlans")
+          .withIndex("by_subject_id", (q) => q.eq("subjectId", subjectId))
+          .collect();
+
+        // Only delete subject if it's only used by lesson plans for this class
+        const isOnlyUsedByThisClass = otherLessonPlans.every(
+          (plan) => plan.classId === args.classId && plan.userId === userId
+        );
+
+        if (isOnlyUsedByThisClass) {
+          const subjectDoc = await ctx.db.get(subjectId);
+          if (subjectDoc && subjectDoc.userId === userId) {
+            try {
+              await ctx.db.delete(subjectId);
+            } catch (subjectError) {
+              console.error(`Error deleting subject ${subjectId}:`, subjectError);
+            }
+          }
+        }
+      }
+
+      // Finally, delete the class
       await ctx.db.delete(args.classId);
       return null;
     } catch (error) {

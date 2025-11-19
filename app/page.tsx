@@ -15,6 +15,8 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/
 import { ClassListItem } from "@/app/_components/classListItem";
 import { SubjectListItem } from "@/app/_components/subjectListItem";
 import { AddClassModal } from "@/app/_components/addClassModal";
+import { EditClassModal } from "@/app/_components/editClassModal";
+import { DeleteClassModal } from "@/app/_components/deleteClassModal";
 import { toast } from "sonner";
 
 interface StatCardProps {
@@ -71,6 +73,14 @@ function StatCard({ title, icon, count, onAdd }: StatCardProps) {
 export default function Home() {
   const router = useRouter();
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+  const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
+  const [isDeleteClassModalOpen, setIsDeleteClassModalOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<{
+    _id: Id<"classes">;
+    name: string;
+    gradeLevel: string;
+    academicYear: string;
+  } | null>(null);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -84,7 +94,6 @@ export default function Home() {
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
   
   // Mutations
-  const deleteClass = useMutation(api.functions.classes.mutations.deleteClass);
   const deleteSubject = useMutation(api.functions.subjects.mutations.deleteSubject);
 
   // Redirect immediately without rendering anything if onboarding not completed
@@ -121,17 +130,18 @@ export default function Home() {
   };
 
   const handleEditClass = (id: Id<"classes">) => {
-    // TODO: Navigate to edit class page when implemented
-    router.push(`/classes/${id}/edit`);
+    const classItem = classes?.find((c) => c._id === id);
+    if (classItem) {
+      setSelectedClass(classItem);
+      setIsEditClassModalOpen(true);
+    }
   };
 
-  const handleDeleteClass = async (id: Id<"classes">) => {
-    if (!confirm("Are you sure you want to delete this class?")) return;
-    try {
-      await deleteClass({ classId: id });
-      toast.success("Class deleted");
-    } catch {
-      toast.error("Failed to delete class");
+  const handleDeleteClass = (id: Id<"classes">) => {
+    const classItem = classes?.find((c) => c._id === id);
+    if (classItem) {
+      setSelectedClass(classItem);
+      setIsDeleteClassModalOpen(true);
     }
   };
 
@@ -171,6 +181,22 @@ export default function Home() {
       <AddClassModal
         open={isAddClassModalOpen}
         onOpenChange={setIsAddClassModalOpen}
+      />
+      <EditClassModal
+        open={isEditClassModalOpen}
+        onOpenChange={setIsEditClassModalOpen}
+        classId={selectedClass?._id || null}
+        initialData={selectedClass ? {
+          name: selectedClass.name,
+          gradeLevel: selectedClass.gradeLevel,
+          academicYear: selectedClass.academicYear,
+        } : null}
+      />
+      <DeleteClassModal
+        open={isDeleteClassModalOpen}
+        onOpenChange={setIsDeleteClassModalOpen}
+        classId={selectedClass?._id || null}
+        className={selectedClass?.name || null}
       />
       <main className="h-full w-full overflow-auto">
         <section className="flex flex-col w-full gap-4">
