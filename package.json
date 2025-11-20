@@ -17,6 +17,7 @@
     "@blocknote/core": "^0.42.3",
     "@blocknote/mantine": "^0.42.3",
     "@blocknote/react": "^0.42.3",
+    "@blocknote/shadcn": "^0.42.3",
     "@blocknote/xl-ai": "^0.42.3",
     "@convex-dev/auth": "^0.0.90",
     "@hookform/resolvers": "^5.2.2",

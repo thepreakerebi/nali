@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { LessonPlanItem } from "./lessonPlanItem";
 import { LessonNoteItem } from "./lessonNoteItem";
 import { UserDropdown } from "./userDropdown";
+import { CreateLessonPlanModal } from "./createLessonPlanModal";
 
 
 function AppSidebarContent() {
@@ -51,6 +52,7 @@ function AppSidebarContent() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<Id<"subjects"> | undefined>();
   const [selectedLessonPlanId, setSelectedLessonPlanId] = useState<Id<"lessonPlans"> | undefined>();
   const [isMounted, setIsMounted] = useState(false);
+  const [isCreateLessonPlanModalOpen, setIsCreateLessonPlanModalOpen] = useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -119,8 +121,7 @@ function AppSidebarContent() {
   };
 
   const handleCreateLessonPlan = () => {
-    // TODO: Navigate to create page when implemented
-    router.push("/lesson-plans/new");
+    setIsCreateLessonPlanModalOpen(true);
   };
 
   const handleCreateLessonNote = () => {
@@ -132,6 +133,10 @@ function AppSidebarContent() {
 
   return (
     <>
+      <CreateLessonPlanModal
+        open={isCreateLessonPlanModalOpen}
+        onOpenChange={setIsCreateLessonPlanModalOpen}
+      />
       <SidebarHeader className="p-4">
         <header className="flex items-center gap-2">
           <Image

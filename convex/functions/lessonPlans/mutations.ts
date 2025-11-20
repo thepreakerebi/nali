@@ -2,12 +2,112 @@ import { mutation } from "../../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "../../_generated/api";
+import { Id } from "../../_generated/dataModel";
 import {
   createAuthError,
   createNotFoundError,
   createAuthorizationError,
   createValidationError,
 } from "../utils/errors";
+
+/**
+ * Create a new lesson plan
+ * Requires authentication and ownership of the class and subject
+ * Creates an empty BlockNote document that can be edited
+ */
+export const createLessonPlan = mutation({
+  args: {
+    classId: v.id("classes"),
+    subjectId: v.id("subjects"),
+    title: v.string(),
+  },
+  returns: v.id("lessonPlans"),
+  handler: async (ctx, args): Promise<Id<"lessonPlans">> => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw createAuthError();
+    }
+
+    // Validate title
+    if (!args.title || args.title.trim().length === 0) {
+      throw createValidationError(
+        "title",
+        "Title cannot be empty",
+        "Please provide a title for your lesson plan."
+      );
+    }
+
+    // Verify class exists and user owns it
+    const classDoc = await ctx.db.get(args.classId);
+    if (!classDoc) {
+      throw createNotFoundError(
+        "class",
+        args.classId,
+        "The class may have been deleted. Please refresh the page and try again."
+      );
+    }
+    if (classDoc.userId !== userId) {
+      throw createAuthorizationError("class", "access");
+    }
+
+    // Verify subject exists and user owns it
+    const subjectDoc = await ctx.db.get(args.subjectId);
+    if (!subjectDoc) {
+      throw createNotFoundError(
+        "subject",
+        args.subjectId,
+        "The subject may have been deleted. Please refresh the page and try again."
+      );
+    }
+    if (subjectDoc.userId !== userId) {
+      throw createAuthorizationError("subject", "access");
+    }
+
+    // Verify subject belongs to the class
+    if (subjectDoc.classId !== args.classId) {
+      throw createValidationError(
+        "subject",
+        "Subject does not belong to the selected class",
+        "Please select a subject that belongs to the chosen class."
+      );
+    }
+
+    // Create empty BlockNote content (default document structure)
+    const emptyContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [],
+        },
+      ],
+    };
+
+    try {
+      // Use internal mutation to create the lesson plan
+      const lessonPlanId = await ctx.runMutation(
+        // @ts-expect-error - internal API path structure not fully typed by Convex
+        (internal as unknown as { functions: { lessonPlans: { mutations: { createLessonPlan: unknown } } } }).functions.lessonPlans.mutations.createLessonPlan,
+        {
+          userId,
+          classId: args.classId,
+          subjectId: args.subjectId,
+          title: args.title.trim(),
+          content: emptyContent,
+        }
+      ) as Id<"lessonPlans">;
+
+      return lessonPlanId;
+    } catch (error) {
+      console.error("Error creating lesson plan:", error);
+      throw createValidationError(
+        "lesson plan creation",
+        "Failed to create lesson plan",
+        "Please try again. If the problem persists, refresh the page."
+      );
+    }
+  },
+});
 
 /**
  * Update a lesson plan

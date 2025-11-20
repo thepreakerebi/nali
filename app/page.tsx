@@ -19,6 +19,7 @@ import { DeleteClassModal } from "@/app/_components/deleteClassModal";
 import { AddSubjectModal } from "@/app/_components/addSubjectModal";
 import { EditSubjectModal } from "@/app/_components/editSubjectModal";
 import { DeleteSubjectModal } from "@/app/_components/deleteSubjectModal";
+import { CreateLessonPlanModal } from "@/app/_components/createLessonPlanModal";
 
 interface StatCardProps {
   title: string;
@@ -92,6 +93,7 @@ export default function Home() {
     description?: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<"classes" | "subjects">("classes");
+  const [isCreateLessonPlanModalOpen, setIsCreateLessonPlanModalOpen] = useState(false);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -129,7 +131,7 @@ export default function Home() {
   };
 
   const handleCreateLessonPlan = () => {
-    router.push("/lesson-plans/new");
+    setIsCreateLessonPlanModalOpen(true);
   };
 
   const handleCreateLessonNote = () => {
@@ -264,6 +266,10 @@ export default function Home() {
         onOpenChange={setIsDeleteSubjectModalOpen}
         subjectId={selectedSubject?._id || null}
         subjectName={selectedSubject?.name || null}
+      />
+      <CreateLessonPlanModal
+        open={isCreateLessonPlanModalOpen}
+        onOpenChange={setIsCreateLessonPlanModalOpen}
       />
       <section className="flex flex-col w-full gap-4">
         {/* Stats Cards Section */}
