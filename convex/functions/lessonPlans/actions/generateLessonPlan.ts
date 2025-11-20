@@ -548,19 +548,122 @@ export const generateLessonPlan = internalAction({
           if (paraToken.tokens && paraToken.tokens.length > 0) {
             inlineContent = tokensToInlineContent(paraToken.tokens);
           } else if (textContent.trim().length > 0) {
-            // Parse text that might contain markdown syntax
-            try {
-              const textTokens = marked.lexer(textContent);
-              if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
-                const textParaToken = textTokens[0] as Tokens.Paragraph;
-                inlineContent = tokensToInlineContent(textParaToken.tokens || []);
-              } else {
-                // Fallback: just use the text
+            // Check if text contains markdown links [text](url) that weren't parsed
+            const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+            const hasMarkdownLinks = markdownLinkRegex.test(textContent);
+            
+            if (hasMarkdownLinks) {
+              // Re-parse the entire text to catch markdown links
+              try {
+                const textTokens = marked.lexer(textContent);
+                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                  const textParaToken = textTokens[0] as Tokens.Paragraph;
+                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                } else {
+                  // Try parsing as inline markdown
+                  const inlineTokens = marked.lexer(textContent);
+                  if (inlineTokens.length > 0) {
+                    for (const token of inlineTokens) {
+                      if (token.type === "paragraph") {
+                        const paraToken = token as Tokens.Paragraph;
+                        inlineContent = tokensToInlineContent(paraToken.tokens || []);
+                        break;
+                      }
+                    }
+                  }
+                  // Fallback: manually parse markdown links
+                  if (inlineContent.length === 0) {
+                    let lastIndex = 0;
+                    markdownLinkRegex.lastIndex = 0; // Reset regex
+                    let match;
+                    while ((match = markdownLinkRegex.exec(textContent)) !== null) {
+                      // Add text before link
+                      if (match.index > lastIndex) {
+                        const beforeText = textContent.substring(lastIndex, match.index);
+                        if (beforeText.trim()) {
+                          inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                        }
+                      }
+                      // Add link
+                      const linkText = match[1];
+                      let linkUrl = match[2];
+                      // Clean URL
+                      if (linkUrl.includes("?")) {
+                        const [baseUrl, params] = linkUrl.split("?");
+                        if (params) {
+                          const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                          linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                        }
+                      }
+                      inlineContent.push({
+                        type: "link",
+                        content: linkText,
+                        href: linkUrl,
+                      });
+                      lastIndex = markdownLinkRegex.lastIndex;
+                    }
+                    // Add remaining text
+                    if (lastIndex < textContent.length) {
+                      const remainingText = textContent.substring(lastIndex);
+                      if (remainingText.trim()) {
+                        inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // If parsing fails, try manual link extraction
+                try {
+                  let lastIndex = 0;
+                  markdownLinkRegex.lastIndex = 0;
+                  let match;
+                  while ((match = markdownLinkRegex.exec(textContent)) !== null) {
+                    if (match.index > lastIndex) {
+                      const beforeText = textContent.substring(lastIndex, match.index);
+                      if (beforeText.trim()) {
+                        inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                      }
+                    }
+                    let linkUrl = match[2];
+                    if (linkUrl.includes("?")) {
+                      const [baseUrl, params] = linkUrl.split("?");
+                      if (params) {
+                        const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                        linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                      }
+                    }
+                    inlineContent.push({
+                      type: "link",
+                      content: match[1],
+                      href: linkUrl,
+                    });
+                    lastIndex = markdownLinkRegex.lastIndex;
+                  }
+                  if (lastIndex < textContent.length) {
+                    const remainingText = textContent.substring(lastIndex);
+                    if (remainingText.trim()) {
+                      inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                    }
+                  }
+                } catch {
+                  inlineContent = [{ type: "text", text: textContent, styles: {} }];
+                }
+              }
+            } else {
+              // Parse text that might contain markdown syntax (bold, italic, etc.)
+              try {
+                const textTokens = marked.lexer(textContent);
+                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                  const textParaToken = textTokens[0] as Tokens.Paragraph;
+                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                } else {
+                  // Fallback: just use the text
+                  inlineContent = [{ type: "text", text: textContent, styles: {} }];
+                }
+              } catch {
+                // If parsing fails, use raw text
                 inlineContent = [{ type: "text", text: textContent, styles: {} }];
               }
-            } catch {
-              // If parsing fails, use raw text
-              inlineContent = [{ type: "text", text: textContent, styles: {} }];
             }
           }
           
@@ -634,17 +737,78 @@ export const generateLessonPlan = internalAction({
             if (itemToken.tokens && itemToken.tokens.length > 0) {
               inlineContent = tokensToInlineContent(itemToken.tokens);
             } else if (itemToken.text && itemToken.text.trim().length > 0) {
-              // Parse text that might contain markdown syntax
-              try {
-                const textTokens = marked.lexer(itemToken.text);
-                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
-                  const textParaToken = textTokens[0] as Tokens.Paragraph;
-                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
-                } else {
+              // Check if text contains markdown links [text](url) that weren't parsed
+              const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+              const hasMarkdownLinks = markdownLinkRegex.test(itemToken.text);
+              
+              if (hasMarkdownLinks) {
+                // Re-parse the entire text to catch markdown links
+                try {
+                  const textTokens = marked.lexer(itemToken.text);
+                  if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                    const textParaToken = textTokens[0] as Tokens.Paragraph;
+                    inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                  } else {
+                    // Try manual link extraction
+                    let lastIndex = 0;
+                    markdownLinkRegex.lastIndex = 0;
+                    let match;
+                    while ((match = markdownLinkRegex.exec(itemToken.text)) !== null) {
+                      if (match.index > lastIndex) {
+                        const beforeText = itemToken.text.substring(lastIndex, match.index);
+                        if (beforeText.trim()) {
+                          inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                        }
+                      }
+                      let linkUrl = match[2];
+                      if (linkUrl.includes("?")) {
+                        const [baseUrl, params] = linkUrl.split("?");
+                        if (params) {
+                          const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                          linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                        }
+                      }
+                      inlineContent.push({
+                        type: "link",
+                        content: match[1],
+                        href: linkUrl,
+                      });
+                      lastIndex = markdownLinkRegex.lastIndex;
+                    }
+                    if (lastIndex < itemToken.text.length) {
+                      const remainingText = itemToken.text.substring(lastIndex);
+                      if (remainingText.trim()) {
+                        inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                      }
+                    }
+                  }
+                } catch {
+                  // Fallback: parse as regular markdown
+                  try {
+                    const textTokens = marked.lexer(itemToken.text);
+                    if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                      const textParaToken = textTokens[0] as Tokens.Paragraph;
+                      inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                    } else {
+                      inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                    }
+                  } catch {
+                    inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                  }
+                }
+              } else {
+                // Parse text that might contain markdown syntax (bold, italic, etc.)
+                try {
+                  const textTokens = marked.lexer(itemToken.text);
+                  if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                    const textParaToken = textTokens[0] as Tokens.Paragraph;
+                    inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                  } else {
+                    inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                  }
+                } catch {
                   inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
                 }
-              } catch {
-                inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
               }
             }
             
