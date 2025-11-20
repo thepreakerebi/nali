@@ -13,7 +13,8 @@ const searchCurriculumResourcesSchema = z.object({
   gradeLevel: z.string().describe("The grade level"),
   country: z.string().optional().describe("Country for curriculum alignment (e.g., Rwanda)"),
   region: z.string().optional().describe("Region within the country"),
-  limit: z.number().optional().default(10).describe("Maximum number of results to return"),
+  limit: z.number().optional().default(10).describe("Maximum number of results to return (max 20)"),
+  categories: z.array(z.enum(["github", "research", "pdf"])).optional().describe("Optional categories to filter search (github, research, pdf)"),
 });
 
 type SearchCurriculumResourcesParams = z.infer<
@@ -35,7 +36,7 @@ interface FirecrawlSearchResult {
 export function createSearchCurriculumResourcesTool() {
   return tool({
     description:
-      "Search for curriculum-aligned educational resources including curriculum documents, YouTube videos, and educational websites relevant to a specific topic, subject, and grade level. Use this to find resources that align with national curriculum standards.",
+      "Search for curriculum-aligned educational resources including curriculum documents, YouTube videos, and educational websites relevant to a specific topic, subject, and grade level. Use this to find resources that align with national curriculum standards. Returns URLs, titles, and descriptions that can be used directly in the lesson plan.",
     inputSchema: searchCurriculumResourcesSchema,
     execute: async ({
       topic,
@@ -44,17 +45,41 @@ export function createSearchCurriculumResourcesTool() {
       country = "Rwanda",
       region,
       limit = 10,
+      categories,
     }: SearchCurriculumResourcesParams) => {
       const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
       if (!firecrawlApiKey) {
         throw new Error("FIRECRAWL_API_KEY environment variable is not set");
       }
 
-      // Build search query
+      // Build comprehensive search query
       const location = region ? `${country}, ${region}` : country;
-      const searchQuery = `${topic} ${subject} ${gradeLevel} curriculum ${location} lesson plan educational resources`;
+      const searchQuery = `${topic} ${subject} ${gradeLevel} curriculum ${location} lesson plan educational resources teaching materials`;
 
       try {
+        // Prepare request body with optional categories
+        const requestBody: {
+          query: string;
+          limit: number;
+          location?: string;
+          sources: string[];
+          categories?: string[];
+        } = {
+          query: searchQuery,
+          limit: Math.min(limit, 20), // Cap at 20 for cost control
+          sources: ["web"],
+        };
+
+        // Add location if provided
+        if (location) {
+          requestBody.location = location;
+        }
+
+        // Add categories if provided
+        if (categories && categories.length > 0) {
+          requestBody.categories = categories;
+        }
+
         // Call Firecrawl Search API
         const searchResponse = await fetch(
           "https://api.firecrawl.dev/v2/search",
@@ -64,12 +89,7 @@ export function createSearchCurriculumResourcesTool() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${firecrawlApiKey}`,
             },
-            body: JSON.stringify({
-              query: searchQuery,
-              limit: Math.min(limit, 20), // Cap at 20 for cost control
-              location: location,
-              sources: ["web"],
-            }),
+            body: JSON.stringify(requestBody),
           }
         );
 

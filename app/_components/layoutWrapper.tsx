@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { AppSidebar } from "./sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSaveStatus } from "./saveStatusContext";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
@@ -49,7 +49,7 @@ function PageTitle() {
     // Check for lesson plan
     if (lessonPlanId) {
       if (lessonPlan === undefined) {
-        return null; // Still loading
+        return "Lesson Plan"; // Still loading
       }
       if (lessonPlan === null) {
         return null; // Not found
@@ -60,7 +60,7 @@ function PageTitle() {
     // Check for lesson note
     if (lessonNoteId) {
       if (lessonNote === undefined) {
-        return null; // Still loading
+        return "Lesson Note"; // Still loading
       }
       if (lessonNote === null) {
         return null; // Not found

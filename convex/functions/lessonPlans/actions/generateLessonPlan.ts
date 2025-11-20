@@ -24,7 +24,6 @@ import { marked } from "marked";
 import type { Tokens } from "marked";
 import type { Block } from "@blocknote/core";
 import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumResources";
-import { createExtractResourceContentTool } from "../tools/extractResourceContent";
 
 // Schema for structured lesson plan metadata extraction
 const lessonPlanMetadataSchema = z.object({
@@ -106,14 +105,13 @@ export const generateLessonPlan = internalAction({
       const country = args.country || userProfile?.country || undefined;
       const language = args.language || userProfile?.preferredLanguage || "en";
 
-      // Create agent with Firecrawl tools for curriculum resource search and extraction
-      // The agent will search for curriculum resources and extract detailed content as needed
+      // Create agent with Firecrawl search tool for curriculum resource discovery
+      // The agent will search for curriculum resources and use the results directly
       const agent = new Agent({
         model: openai("gpt-4o"),
         system: LESSON_PLAN_GENERATION_SYSTEM_PROMPT,
         tools: {
           searchCurriculumResources: createSearchCurriculumResourcesTool(),
-          extractResourceContent: createExtractResourceContentTool(),
         },
         stopWhen: stepCountIs(15),
       });
@@ -139,8 +137,8 @@ export const generateLessonPlan = internalAction({
         throw new Error("Failed to generate lesson plan content");
       }
 
-      // Extract resources from Firecrawl tool results
-      // Check tool results in agent steps for searchCurriculumResources and extractResourceContent
+      // Extract resources from Firecrawl search tool results
+      // Check tool results in agent steps for searchCurriculumResources
       let extractedResources: Array<{
         type: "youtube" | "document" | "link";
         title: string;
@@ -207,69 +205,10 @@ export const generateLessonPlan = internalAction({
         }
       }
 
-      // Process extractResourceContent tool results (these have more detailed information)
-      const extractResults = toolResults.filter((tr) => tr.toolName === "extractResourceContent");
-      for (const extractResult of extractResults) {
-        // Check if result exists before accessing properties (following Shamp pattern)
-        if (!extractResult.result) {
-          continue;
-        }
-        
-        const resultAny = extractResult.result as {
-          resources?: Array<{
-            url: string;
-            title: string;
-            summary?: string;
-            type?: "youtube" | "document" | "link";
-            educationalValue?: string;
-          }>;
-        };
-        
-        if (resultAny?.resources && Array.isArray(resultAny.resources)) {
-          resultAny.resources
-            .filter((resource) => {
-              if (!resource.url) return false;
-              // Filter out URLs with utm_source parameters
-              return !resource.url.includes("utm_source=");
-            })
-            .forEach((resource) => {
-              // Remove any utm parameters from URL
-              const urlParts = resource.url.split("?");
-              const baseUrl = urlParts[0];
-              const params = urlParts[1] 
-                ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") 
-                : "";
-              const cleanUrl = baseUrl + (params ? "?" + params : "");
-              
-              // Use extract results (more detailed) but don't duplicate if already in extractedResources
-              const existingIndex = extractedResources.findIndex((r) => r.url === cleanUrl);
-              if (existingIndex >= 0) {
-                // Update existing resource with more detailed info from extraction
-                extractedResources[existingIndex] = {
-                  ...extractedResources[existingIndex],
-                  description: resource.summary || resource.educationalValue || extractedResources[existingIndex].description,
-                };
-              } else {
-                // Add new resource
-                extractedResources.push({
-                  type: (resource.type || 
-                    (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
-                      ? "youtube" 
-                      : "link")) as "youtube" | "document" | "link",
-                  title: resource.title || "Untitled",
-                  url: cleanUrl,
-                  description: resource.summary || resource.educationalValue || "",
-                });
-              }
-            });
-        }
-      }
-
       // Remove duplicates based on URL
-      const uniqueResources = extractedResources.filter((resource, index, self) =>
+      extractedResources = extractedResources.filter((resource, index, self) =>
         index === self.findIndex((r) => r.url === resource.url)
       );
-      extractedResources = uniqueResources;
 
       // Extract structured metadata from generated content
       let metadata: {
