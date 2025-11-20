@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import * as React from "react";
 import Image from "next/image";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -35,7 +35,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LessonPlanItem } from "./lessonPlanItem";
 import { LessonNoteItem } from "./lessonNoteItem";
@@ -43,6 +42,9 @@ import { UserDropdown } from "./userDropdown";
 import { CreateLessonPlanModal } from "./createLessonPlanModal";
 import { DeleteLessonPlanModal } from "./deleteLessonPlanModal";
 import { EditLessonPlanTitleModal } from "./editLessonPlanTitleModal";
+import { CreateLessonNoteModal } from "./createLessonNoteModal";
+import { DeleteLessonNoteModal } from "./deleteLessonNoteModal";
+import { EditLessonNoteTitleModal } from "./editLessonNoteTitleModal";
 
 
 function AppSidebarContent() {
@@ -63,6 +65,17 @@ function AppSidebarContent() {
   } | null>(null);
   const [selectedLessonPlanForEdit, setSelectedLessonPlanForEdit] = useState<{
     id: Id<"lessonPlans">;
+    title: string;
+  } | null>(null);
+  const [isCreateLessonNoteModalOpen, setIsCreateLessonNoteModalOpen] = useState(false);
+  const [isDeleteLessonNoteModalOpen, setIsDeleteLessonNoteModalOpen] = useState(false);
+  const [isEditLessonNoteTitleModalOpen, setIsEditLessonNoteTitleModalOpen] = useState(false);
+  const [selectedLessonNoteForDelete, setSelectedLessonNoteForDelete] = useState<{
+    id: Id<"lessonNotes">;
+    title: string;
+  } | null>(null);
+  const [selectedLessonNoteForEdit, setSelectedLessonNoteForEdit] = useState<{
+    id: Id<"lessonNotes">;
     title: string;
   } | null>(null);
 
@@ -86,7 +99,6 @@ function AppSidebarContent() {
   );
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
-  const deleteLessonNote = useMutation(api.functions.lessonNotes.mutations.deleteLessonNote);
 
   // Filter lesson plans by search
   const filteredLessonPlans = useMemo(() => {
@@ -114,13 +126,19 @@ function AppSidebarContent() {
     }
   };
 
-  const handleDeleteLessonNote = async (id: Id<"lessonNotes">) => {
-    if (!confirm("Are you sure you want to delete this lesson note?")) return;
-    try {
-      await deleteLessonNote({ lessonNoteId: id });
-      toast.success("Lesson note deleted");
-    } catch {
-      toast.error("Failed to delete lesson note");
+  const handleDeleteLessonNote = (id: Id<"lessonNotes">) => {
+    const note = lessonNotes?.find((n) => n._id === id);
+    if (note) {
+      setSelectedLessonNoteForDelete({ id, title: note.title });
+      setIsDeleteLessonNoteModalOpen(true);
+    }
+  };
+
+  const handleEditLessonNote = (id: Id<"lessonNotes">) => {
+    const note = lessonNotes?.find((n) => n._id === id);
+    if (note) {
+      setSelectedLessonNoteForEdit({ id, title: note.title });
+      setIsEditLessonNoteTitleModalOpen(true);
     }
   };
 
@@ -137,8 +155,7 @@ function AppSidebarContent() {
   };
 
   const handleCreateLessonNote = () => {
-    // TODO: Navigate to create page when implemented
-    router.push("/lesson-notes/new");
+    setIsCreateLessonNoteModalOpen(true);
   };
 
   const isHomeActive = pathname === "/";
@@ -170,6 +187,32 @@ function AppSidebarContent() {
         }}
         lessonPlanId={selectedLessonPlanForEdit?.id ?? null}
         initialTitle={selectedLessonPlanForEdit?.title ?? null}
+      />
+      <CreateLessonNoteModal
+        open={isCreateLessonNoteModalOpen}
+        onOpenChange={setIsCreateLessonNoteModalOpen}
+      />
+      <DeleteLessonNoteModal
+        open={isDeleteLessonNoteModalOpen}
+        onOpenChange={(open) => {
+          setIsDeleteLessonNoteModalOpen(open);
+          if (!open) {
+            setSelectedLessonNoteForDelete(null);
+          }
+        }}
+        lessonNoteId={selectedLessonNoteForDelete?.id ?? null}
+        lessonNoteTitle={selectedLessonNoteForDelete?.title ?? null}
+      />
+      <EditLessonNoteTitleModal
+        open={isEditLessonNoteTitleModalOpen}
+        onOpenChange={(open) => {
+          setIsEditLessonNoteTitleModalOpen(open);
+          if (!open) {
+            setSelectedLessonNoteForEdit(null);
+          }
+        }}
+        lessonNoteId={selectedLessonNoteForEdit?.id ?? null}
+        initialTitle={selectedLessonNoteForEdit?.title ?? null}
       />
       <SidebarHeader className="p-4">
         <header className="flex items-center gap-2">
@@ -408,7 +451,8 @@ function AppSidebarContent() {
                     <li key={note._id}>
                       <LessonNoteItem
                         note={note}
-                          isActive={isActive}
+                        isActive={isActive}
+                        onEdit={handleEditLessonNote}
                         onDelete={handleDeleteLessonNote}
                       />
                     </li>

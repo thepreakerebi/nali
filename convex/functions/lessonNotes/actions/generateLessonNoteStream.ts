@@ -478,7 +478,7 @@ export const generateLessonNoteStream = action({
       // Store lesson note
       const lessonNoteId = await ctx.runMutation(
         // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { mutations: { createLessonNote: unknown } } } }).functions.lessonNotes.mutations.createLessonNote,
+        (internal as unknown as { functions: { lessonNotes: { mutations: { createLessonNoteInternal: unknown } } } }).functions.lessonNotes.mutations.createLessonNoteInternal,
         {
           userId: authUserId,
           lessonPlanId: args.lessonPlanId,

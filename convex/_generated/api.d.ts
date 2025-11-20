@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as functions_actions_semanticSearch from "../functions/actions/semanticSearch.js";
 import type * as functions_classes_mutations from "../functions/classes/mutations.js";
 import type * as functions_classes_queries from "../functions/classes/queries.js";
+import type * as functions_lessonNotes_actions_generateLessonNote from "../functions/lessonNotes/actions/generateLessonNote.js";
 import type * as functions_lessonNotes_actions_generateLessonNoteStream from "../functions/lessonNotes/actions/generateLessonNoteStream.js";
 import type * as functions_lessonNotes_actions_updateEmbedding from "../functions/lessonNotes/actions/updateEmbedding.js";
 import type * as functions_lessonNotes_mutations from "../functions/lessonNotes/mutations.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   "functions/actions/semanticSearch": typeof functions_actions_semanticSearch;
   "functions/classes/mutations": typeof functions_classes_mutations;
   "functions/classes/queries": typeof functions_classes_queries;
+  "functions/lessonNotes/actions/generateLessonNote": typeof functions_lessonNotes_actions_generateLessonNote;
   "functions/lessonNotes/actions/generateLessonNoteStream": typeof functions_lessonNotes_actions_generateLessonNoteStream;
   "functions/lessonNotes/actions/updateEmbedding": typeof functions_lessonNotes_actions_updateEmbedding;
   "functions/lessonNotes/mutations": typeof functions_lessonNotes_mutations;
