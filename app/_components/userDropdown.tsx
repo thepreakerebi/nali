@@ -123,7 +123,7 @@ export function UserDropdown() {
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="end" className="w-48">
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
           <SettingsIcon className="size-4" />
           Settings
         </DropdownMenuItem>

@@ -46,6 +46,11 @@ function PageTitle() {
       return "Home";
     }
     
+    // Check for settings page
+    if (pathname === "/settings") {
+      return "Settings";
+    }
+    
     // Check for lesson plan
     if (lessonPlanId) {
       if (lessonPlan === undefined) {
