@@ -20,6 +20,7 @@ import { AddSubjectModal } from "@/app/_components/addSubjectModal";
 import { EditSubjectModal } from "@/app/_components/editSubjectModal";
 import { DeleteSubjectModal } from "@/app/_components/deleteSubjectModal";
 import { CreateLessonPlanModal } from "@/app/_components/createLessonPlanModal";
+import { CreateLessonNoteModal } from "@/app/_components/createLessonNoteModal";
 
 interface StatCardProps {
   title: string;
@@ -94,6 +95,7 @@ export default function Home() {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<"classes" | "subjects">("classes");
   const [isCreateLessonPlanModalOpen, setIsCreateLessonPlanModalOpen] = useState(false);
+  const [isCreateLessonNoteModalOpen, setIsCreateLessonNoteModalOpen] = useState(false);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -135,7 +137,7 @@ export default function Home() {
   };
 
   const handleCreateLessonNote = () => {
-    router.push("/lesson-notes/new");
+    setIsCreateLessonNoteModalOpen(true);
   };
 
   const handleEditClass = (id: Id<"classes">) => {
@@ -270,6 +272,10 @@ export default function Home() {
       <CreateLessonPlanModal
         open={isCreateLessonPlanModalOpen}
         onOpenChange={setIsCreateLessonPlanModalOpen}
+      />
+      <CreateLessonNoteModal
+        open={isCreateLessonNoteModalOpen}
+        onOpenChange={setIsCreateLessonNoteModalOpen}
       />
       <section className="flex flex-col w-full gap-4">
         {/* Stats Cards Section */}

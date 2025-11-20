@@ -250,6 +250,24 @@ export const updateLessonNoteInternal = internalMutation({
 });
 
 /**
+ * Internal mutation to update lesson note embedding
+ * Used by scheduled actions that don't have auth context
+ */
+export const updateEmbeddingInternal = internalMutation({
+  args: {
+    lessonNoteId: v.id("lessonNotes"),
+    embedding: v.array(v.float64()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.lessonNoteId, {
+      embedding: args.embedding,
+    });
+    return null;
+  },
+});
+
+/**
  * Delete a lesson note
  * Requires authentication and ownership of the lesson note
  */

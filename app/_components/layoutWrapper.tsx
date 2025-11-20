@@ -79,10 +79,11 @@ function SaveStatusAlert() {
   const { saveStatus } = useSaveStatus();
   const pathname = usePathname();
   
-  // Only show on lesson plan pages
+  // Show on lesson plan and lesson note pages
   const isLessonPlanPage = pathname?.startsWith("/lesson-plans/");
+  const isLessonNotePage = pathname?.startsWith("/lesson-notes/");
   
-  if (!isLessonPlanPage || saveStatus === "idle") {
+  if ((!isLessonPlanPage && !isLessonNotePage) || saveStatus === "idle") {
     return null;
   }
   

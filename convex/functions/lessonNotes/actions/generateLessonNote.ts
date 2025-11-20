@@ -57,9 +57,10 @@ export const generateLessonNote = internalAction({
       // Ownership was already verified in the mutation before scheduling this action
       
       // Get lesson plan details using internal queries
+      // Internal queries are in queries.ts and accessed via internal.functions.{module}.queries.{name}
       const lessonPlan = await ctx.runQuery(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { queries: { getLessonPlanForNoteGeneration: unknown } } } }).functions.lessonNotes.queries.getLessonPlanForNoteGeneration,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (internal as any).functions.lessonNotes.queries.getLessonPlanForNoteGeneration,
         {
           lessonPlanId: args.lessonPlanId,
         }
@@ -71,8 +72,8 @@ export const generateLessonNote = internalAction({
 
       // Get class and subject details
       const { class: classDoc, subject: subjectDoc } = await ctx.runQuery(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { queries: { getClassAndSubjectDetailsForNote: unknown } } } }).functions.lessonNotes.queries.getClassAndSubjectDetailsForNote,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (internal as any).functions.lessonNotes.queries.getClassAndSubjectDetailsForNote,
         {
           lessonPlanId: args.lessonPlanId,
         }
