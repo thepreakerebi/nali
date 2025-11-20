@@ -184,9 +184,9 @@ export const deleteSubject = mutation({
 
     try {
       // Delete all lesson plans for this subject (which will cascade delete lesson notes)
-      const lessonPlans = await ctx.db
-        .query("lessonPlans")
-        .withIndex("by_subject_id", (q) => q.eq("subjectId", args.subjectId))
+    const lessonPlans = await ctx.db
+      .query("lessonPlans")
+      .withIndex("by_subject_id", (q) => q.eq("subjectId", args.subjectId))
         .collect();
 
       for (const plan of lessonPlans) {
@@ -204,7 +204,7 @@ export const deleteSubject = mutation({
                 await ctx.db.delete(note._id);
               } catch (noteError) {
                 console.error(`Error deleting lesson note ${note._id}:`, noteError);
-              }
+    }
             }
           }
 

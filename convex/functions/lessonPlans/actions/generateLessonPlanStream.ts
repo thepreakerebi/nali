@@ -23,8 +23,6 @@ import { createSearchSimilarPlansTool } from "../tools/searchSimilarPlans";
 import { generateEmbedding } from "../../utils/embeddings";
 import {
   createExternalAPIError,
-  createContentGenerationError,
-  createEmbeddingError,
   formatError,
 } from "../../utils/errors";
 import type { Id } from "../../../_generated/dataModel";
@@ -111,6 +109,7 @@ const lessonPlanMetadataSchema = z.object({
  */
 export const generateLessonPlanStream = action({
   args: {
+    lessonPlanId: v.optional(v.id("lessonPlans")), // Optional: if provided, update existing plan
     classId: v.id("classes"),
     subjectId: v.id("subjects"),
     topic: v.string(),
@@ -429,6 +428,92 @@ export const generateLessonPlanStream = action({
         };
       }
 
+      yield { type: "status", message: "Saving lesson plan..." };
+
+      // Convert text to Blocknote JSON format
+      // Split by double newlines to create paragraphs
+      const paragraphs = fullText
+        .split(/\n\n+/)
+        .filter((p) => p.trim().length > 0);
+
+      const blocknoteContent = paragraphs.map((paragraph) => {
+          // Detect headings (lines starting with #)
+          const trimmed = paragraph.trim();
+          if (trimmed.startsWith("# ")) {
+            return {
+              type: "heading",
+              props: {
+                level: 1,
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: trimmed.substring(2),
+                  styles: {},
+                },
+              ],
+              children: [],
+            };
+          } else if (trimmed.startsWith("## ")) {
+            return {
+              type: "heading",
+              props: {
+                level: 2,
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: trimmed.substring(3),
+                  styles: {},
+                },
+              ],
+              children: [],
+            };
+          } else if (trimmed.startsWith("### ")) {
+            return {
+              type: "heading",
+              props: {
+                level: 3,
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: trimmed.substring(4),
+                  styles: {},
+                },
+              ],
+              children: [],
+            };
+          } else {
+            // Regular paragraph
+            return {
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: trimmed,
+                  styles: {},
+                },
+              ],
+              children: [],
+            };
+          }
+        });
+
       yield { type: "status", message: "Generating embedding..." };
 
       // Generate embedding for the lesson plan
@@ -438,110 +523,92 @@ export const generateLessonPlanStream = action({
         embedding = await generateEmbedding(embeddingText);
       } catch (embeddingError) {
         console.error("Error generating embedding:", embeddingError);
-        const error = createEmbeddingError();
-        yield {
-          type: "error",
-          error: `${error.message} ${error.action || ""}`,
-        };
-        return;
+        // Don't fail if embedding generation fails - the scheduled update will handle it
+        embedding = [];
       }
 
-      yield { type: "status", message: "Saving lesson plan..." };
-
-      // Convert text to Blocknote JSON format
-      // Split by double newlines to create paragraphs
-      const paragraphs = fullText
-        .split(/\n\n+/)
-        .filter((p) => p.trim().length > 0);
-
-      const blocknoteContent = {
-        blocks: paragraphs.map((paragraph, idx) => {
-          // Detect headings (lines starting with #)
-          const trimmed = paragraph.trim();
-          if (trimmed.startsWith("# ")) {
-            return {
-              id: `block-${idx}`,
-              type: "heading",
-              props: { level: 1 },
-              content: [
-                {
-                  type: "text",
-                  text: trimmed.substring(2),
-                  styles: {},
-                },
-              ],
-            };
-          } else if (trimmed.startsWith("## ")) {
-            return {
-              id: `block-${idx}`,
-              type: "heading",
-              props: { level: 2 },
-              content: [
-                {
-                  type: "text",
-                  text: trimmed.substring(3),
-                  styles: {},
-                },
-              ],
-            };
-          } else if (trimmed.startsWith("### ")) {
-            return {
-              id: `block-${idx}`,
-              type: "heading",
-              props: { level: 3 },
-              content: [
-                {
-                  type: "text",
-                  text: trimmed.substring(4),
-                  styles: {},
-                },
-              ],
-            };
-          } else {
-            // Regular paragraph
-            return {
-              id: `block-${idx}`,
-              type: "paragraph",
-              content: [
-                {
-                  type: "text",
-                  text: trimmed,
-                  styles: {},
-                },
-              ],
-            };
+      // If lessonPlanId is provided, update existing plan; otherwise create new one
+      let finalLessonPlanId: Id<"lessonPlans">;
+      
+      if (args.lessonPlanId) {
+        // Update existing lesson plan
+        finalLessonPlanId = args.lessonPlanId;
+        
+        // Get existing plan to preserve title
+        const existingPlan = await ctx.runQuery(
+          api.functions.lessonPlans.queries.getLessonPlan,
+          { lessonPlanId: args.lessonPlanId }
+        );
+        
+        const title = existingPlan?.title || `${args.topic} - ${subjectDoc.name}`;
+        
+        // Update the lesson plan with generated content
+        // The updateLessonPlan mutation will automatically schedule embedding update
+        await ctx.runMutation(
+          api.functions.lessonPlans.mutations.updateLessonPlan,
+          {
+            lessonPlanId: args.lessonPlanId,
+            content: blocknoteContent,
+            objectives: metadata.objectives,
+            materials: metadata.materials,
+            methods: metadata.methods,
+            assessment: metadata.assessment,
+            references: metadata.references,
+            resources: metadata.resources,
           }
-        }),
-      };
-
-      // Create lesson plan title from topic
-      const title = `${args.topic} - ${subjectDoc.name}`;
-
-      // Store lesson plan
-      const lessonPlanId = await ctx.runMutation(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonPlans: { mutations: { createLessonPlan: unknown } } } }).functions.lessonPlans.mutations.createLessonPlan,
-        {
-          userId: authUserId,
-          classId: args.classId,
-          subjectId: args.subjectId,
-          title,
-          content: blocknoteContent,
-          objectives: metadata.objectives,
-          materials: metadata.materials,
-          methods: metadata.methods,
-          assessment: metadata.assessment,
-          references: metadata.references,
-          resources: metadata.resources,
-          embedding,
+        );
+        
+        // Also update embedding directly via internal mutation
+        if (embedding.length > 0) {
+          try {
+            await ctx.runMutation(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (internal as any).functions.lessonPlans.mutations.updateEmbedding,
+              {
+                lessonPlanId: args.lessonPlanId,
+                embedding,
+              }
+            );
+          } catch (embeddingUpdateError) {
+            console.error("Error updating embedding:", embeddingUpdateError);
+            // Don't fail - embedding will be updated by scheduled action
+          }
         }
-      );
-
-      yield {
-        type: "complete",
-        lessonPlanId,
-        title,
-      };
+        
+        yield {
+          type: "complete",
+          lessonPlanId: finalLessonPlanId,
+          title,
+        };
+      } else {
+        // Create new lesson plan
+        const title = `${args.topic} - ${subjectDoc.name}`;
+        
+        finalLessonPlanId = await ctx.runMutation(
+          // @ts-expect-error - internal API path structure not fully typed by Convex
+          (internal as unknown as { functions: { lessonPlans: { mutations: { createLessonPlan: unknown } } } }).functions.lessonPlans.mutations.createLessonPlan,
+          {
+            userId: authUserId,
+            classId: args.classId,
+            subjectId: args.subjectId,
+            title,
+            content: blocknoteContent,
+            objectives: metadata.objectives,
+            materials: metadata.materials,
+            methods: metadata.methods,
+            assessment: metadata.assessment,
+            references: metadata.references,
+            resources: metadata.resources,
+            embedding,
+          }
+        );
+        
+        yield {
+          type: "complete",
+          lessonPlanId: finalLessonPlanId,
+          title,
+        };
+      }
     } catch (error) {
       console.error("Lesson plan generation stream error:", error);
       const formattedError = formatError(error);

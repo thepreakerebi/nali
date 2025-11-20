@@ -100,6 +100,25 @@ export const createLessonPlan = mutation({
         content: emptyContent,
       });
 
+      // Schedule AI generation after creation
+      // Use the title as the topic for generation
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (internal as any).functions.lessonPlans.actions.generateLessonPlanStream,
+          {
+            lessonPlanId,
+            classId: args.classId,
+            subjectId: args.subjectId,
+            topic: args.title.trim(),
+          }
+        );
+      } catch (schedulerError) {
+        // Log but don't fail the creation if scheduling fails
+        console.error("Error scheduling lesson plan generation:", schedulerError);
+      }
+
       return lessonPlanId;
     } catch (error) {
       console.error("Error creating lesson plan:", error);

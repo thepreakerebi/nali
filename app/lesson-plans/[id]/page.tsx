@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -8,6 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { BlockNoteEditor } from "@/app/_components/BlockNoteEditor";
+import { cn } from "@/lib/utils";
 
 export default function LessonPlanEditorPage() {
   const params = useParams();
@@ -21,6 +22,34 @@ export default function LessonPlanEditorPage() {
     lessonPlanId ? { lessonPlanId } : "skip"
   );
   const updateLessonPlan = useMutation(api.functions.lessonPlans.mutations.updateLessonPlan);
+
+  // Check if lesson plan is being generated (content is empty/default)
+  const isGenerating = useMemo(() => {
+    if (!lessonPlan || lessonPlan === null) return false;
+    
+    // Check if content is empty or just the default empty paragraph
+    const content = lessonPlan.content;
+    if (!content || !Array.isArray(content)) return false;
+    
+    // If content has only one empty paragraph, it's likely still generating
+    if (content.length === 1) {
+      const firstBlock = content[0];
+      if (
+        firstBlock &&
+        typeof firstBlock === "object" &&
+        "type" in firstBlock &&
+        firstBlock.type === "paragraph" &&
+        "content" in firstBlock &&
+        Array.isArray(firstBlock.content) &&
+        firstBlock.content.length === 0
+      ) {
+        return true;
+      }
+    }
+    
+    // If content has more than one block or non-empty content, generation is complete
+    return false;
+  }, [lessonPlan]);
 
   // Handle content changes with debouncing
   const handleContentChange = (blocks: unknown) => {
@@ -83,7 +112,12 @@ export default function LessonPlanEditorPage() {
   return (
     <main className="flex flex-col h-full w-full">
       {/* Editor */}
-      <section className="flex-1 overflow-auto p-6 bg-background">
+      <section
+        className={cn(
+          "flex-1 overflow-auto p-6 bg-background transition-all duration-300",
+          isGenerating && "generating-glow"
+        )}
+      >
         <BlockNoteEditor
           initialContent={lessonPlan.content}
           onContentChange={handleContentChange}

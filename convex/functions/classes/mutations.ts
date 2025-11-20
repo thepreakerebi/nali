@@ -185,9 +185,9 @@ export const deleteClass = mutation({
 
     try {
       // Delete all lesson plans for this class (which will cascade delete lesson notes)
-      const lessonPlans = await ctx.db
-        .query("lessonPlans")
-        .withIndex("by_class_id", (q) => q.eq("classId", args.classId))
+    const lessonPlans = await ctx.db
+      .query("lessonPlans")
+      .withIndex("by_class_id", (q) => q.eq("classId", args.classId))
         .collect();
 
       for (const plan of lessonPlans) {
