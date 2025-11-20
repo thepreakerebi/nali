@@ -104,13 +104,11 @@ export function createExtractResourceContentTool() {
                   },
                   videoId: {
                     type: "string",
-                    optional: true,
                     description:
                       "YouTube video ID if this is a YouTube resource",
                   },
                   duration: {
                     type: "string",
-                    optional: true,
                     description: "Duration of video if applicable",
                   },
                 },

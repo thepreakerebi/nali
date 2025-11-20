@@ -76,7 +76,7 @@ export const updateLessonPlanEmbedding = internalAction({
     // Load the lesson plan
     const lessonPlan = await ctx.runQuery(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (internal as any).functions.lessonPlans.queries.internal.getLessonPlanForEmbedding,
+      (internal as any).functions.lessonPlans.queries.getLessonPlanForEmbedding,
       {
         lessonPlanId: args.lessonPlanId,
       }

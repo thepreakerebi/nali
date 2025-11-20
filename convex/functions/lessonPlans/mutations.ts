@@ -102,13 +102,15 @@ export const createLessonPlan = mutation({
 
       // Schedule AI generation after creation
       // Use the title as the topic for generation
+      // Note: Auth is not propagated to scheduled functions, so we pass userId explicitly
       try {
         await ctx.scheduler.runAfter(
           0,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (internal as any).functions.lessonPlans.actions.generateLessonPlanStream,
+          (internal as any).functions.lessonPlans.actions.generateLessonPlan.generateLessonPlan,
           {
             lessonPlanId,
+            userId,
             classId: args.classId,
             subjectId: args.subjectId,
             topic: args.title.trim(),

@@ -54,7 +54,7 @@ export default async function RootLayout({
               <SidebarProvider>
                 <LayoutWrapper>{children}</LayoutWrapper>
               </SidebarProvider>
-              <Toaster />
+              <Toaster position="top-center" />
             </IntlClientProvider>
           </ConvexClientProvider>
         </body>
