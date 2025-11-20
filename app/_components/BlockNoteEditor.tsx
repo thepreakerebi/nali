@@ -25,21 +25,31 @@ export function BlockNoteEditor({ initialContent, onContentChange }: BlockNoteEd
 
   // Load initial content
   useEffect(() => {
-    if (!editor || !initialContent || hasLoadedContentRef.current) return;
+    if (!editor || initialContent === undefined || hasLoadedContentRef.current) return;
 
     try {
-      const content = initialContent as { type?: string; content?: unknown[] } | unknown[];
+      // BlockNote stores content as an array of blocks
       let blocks: unknown[] = [];
       
-      if (Array.isArray(content)) {
-        blocks = content;
-      } else if (content && typeof content === "object" && "content" in content && Array.isArray(content.content)) {
-        blocks = content.content;
+      if (Array.isArray(initialContent)) {
+        // Content is already an array of blocks
+        blocks = initialContent;
+      } else if (
+        initialContent &&
+        typeof initialContent === "object" &&
+        "content" in initialContent &&
+        Array.isArray(initialContent.content)
+      ) {
+        // Content is wrapped in a doc object: { type: "doc", content: [...] }
+        blocks = initialContent.content;
+      } else if (initialContent === null) {
+        // No content yet, use empty array
+        blocks = [];
       }
       
-      if (blocks.length > 0) {
-        editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1]);
-      }
+      // Always replace blocks to ensure content is loaded
+      // BlockNote will handle empty arrays by showing a default paragraph
+      editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1]);
       hasLoadedContentRef.current = true;
     } catch (error) {
       console.error("Error loading content into editor:", error);

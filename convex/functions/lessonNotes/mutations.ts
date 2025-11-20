@@ -8,6 +8,7 @@ import {
   createAuthorizationError,
   createValidationError,
 } from "../utils/errors";
+import { toTitleCase } from "../utils/string";
 
 /**
  * Update a lesson note
@@ -59,7 +60,7 @@ export const updateLessonNote = mutation({
       embedding?: number[];
     } = {};
 
-    if (args.title !== undefined) updates.title = args.title.trim();
+    if (args.title !== undefined) updates.title = toTitleCase(args.title.trim());
     if (args.content !== undefined) updates.content = args.content;
 
     try {

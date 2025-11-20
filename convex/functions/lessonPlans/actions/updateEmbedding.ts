@@ -9,7 +9,6 @@ import { internalAction } from "../../../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../../../_generated/api";
 import { generateEmbedding } from "../../utils/embeddings";
-import { createEmbeddingError } from "../../utils/errors";
 
 /**
  * Convert Blocknote JSON content to readable text for embedding generation
@@ -77,7 +76,7 @@ export const updateLessonPlanEmbedding = internalAction({
     // Load the lesson plan
     const lessonPlan = await ctx.runQuery(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (internal as any).functions.lessonPlans.queries.getLessonPlanForEmbedding,
+      (internal as any).functions.lessonPlans.queries.internal.getLessonPlanForEmbedding,
       {
         lessonPlanId: args.lessonPlanId,
       }

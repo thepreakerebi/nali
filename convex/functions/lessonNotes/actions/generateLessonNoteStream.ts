@@ -23,6 +23,7 @@ import {
   createEmbeddingError,
   formatError,
 } from "../../utils/errors";
+import { toTitleCase } from "../../utils/string";
 import type { Id } from "../../../_generated/dataModel";
 
 // Type definitions for tool results
@@ -472,7 +473,7 @@ export const generateLessonNoteStream = action({
       };
 
       // Create lesson note title from lesson plan title
-      const title = `Lesson Notes: ${lessonPlan.title}`;
+      const title = toTitleCase(`Lesson Notes: ${lessonPlan.title}`);
 
       // Store lesson note
       const lessonNoteId = await ctx.runMutation(

@@ -1,5 +1,6 @@
 import { internalMutation } from "../../_generated/server";
 import { v } from "convex/values";
+import { toTitleCase } from "../utils/string";
 
 /**
  * Internal mutation to create a new lesson note.
@@ -18,7 +19,7 @@ export const createLessonNote = internalMutation({
     return await ctx.db.insert("lessonNotes", {
       userId: args.userId,
       lessonPlanId: args.lessonPlanId,
-      title: args.title,
+      title: toTitleCase(args.title.trim()),
       content: args.content,
       embedding: args.embedding,
     });

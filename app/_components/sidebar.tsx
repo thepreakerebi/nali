@@ -41,6 +41,8 @@ import { LessonPlanItem } from "./lessonPlanItem";
 import { LessonNoteItem } from "./lessonNoteItem";
 import { UserDropdown } from "./userDropdown";
 import { CreateLessonPlanModal } from "./createLessonPlanModal";
+import { DeleteLessonPlanModal } from "./deleteLessonPlanModal";
+import { EditLessonPlanTitleModal } from "./editLessonPlanTitleModal";
 
 
 function AppSidebarContent() {
@@ -53,6 +55,16 @@ function AppSidebarContent() {
   const [selectedLessonPlanId, setSelectedLessonPlanId] = useState<Id<"lessonPlans"> | undefined>();
   const [isMounted, setIsMounted] = useState(false);
   const [isCreateLessonPlanModalOpen, setIsCreateLessonPlanModalOpen] = useState(false);
+  const [isDeleteLessonPlanModalOpen, setIsDeleteLessonPlanModalOpen] = useState(false);
+  const [isEditLessonPlanTitleModalOpen, setIsEditLessonPlanTitleModalOpen] = useState(false);
+  const [selectedLessonPlanForDelete, setSelectedLessonPlanForDelete] = useState<{
+    id: Id<"lessonPlans">;
+    title: string;
+  } | null>(null);
+  const [selectedLessonPlanForEdit, setSelectedLessonPlanForEdit] = useState<{
+    id: Id<"lessonPlans">;
+    title: string;
+  } | null>(null);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -74,7 +86,6 @@ function AppSidebarContent() {
   );
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
-  const deleteLessonPlan = useMutation(api.functions.lessonPlans.mutations.deleteLessonPlan);
   const deleteLessonNote = useMutation(api.functions.lessonNotes.mutations.deleteLessonNote);
 
   // Filter lesson plans by search
@@ -95,13 +106,11 @@ function AppSidebarContent() {
     );
   }, [lessonNotes, lessonNoteSearch]);
 
-  const handleDeleteLessonPlan = async (id: Id<"lessonPlans">) => {
-    if (!confirm("Are you sure you want to delete this lesson plan?")) return;
-    try {
-      await deleteLessonPlan({ lessonPlanId: id });
-      toast.success("Lesson plan deleted");
-    } catch {
-      toast.error("Failed to delete lesson plan");
+  const handleDeleteLessonPlan = (id: Id<"lessonPlans">) => {
+    const plan = lessonPlans?.find((p) => p._id === id);
+    if (plan) {
+      setSelectedLessonPlanForDelete({ id, title: plan.title });
+      setIsDeleteLessonPlanModalOpen(true);
     }
   };
 
@@ -116,8 +125,11 @@ function AppSidebarContent() {
   };
 
   const handleEditLessonPlan = (id: Id<"lessonPlans">) => {
-    // TODO: Navigate to edit page when implemented
-    router.push(`/lesson-plans/${id}`);
+    const plan = lessonPlans?.find((p) => p._id === id);
+    if (plan) {
+      setSelectedLessonPlanForEdit({ id, title: plan.title });
+      setIsEditLessonPlanTitleModalOpen(true);
+    }
   };
 
   const handleCreateLessonPlan = () => {
@@ -136,6 +148,28 @@ function AppSidebarContent() {
       <CreateLessonPlanModal
         open={isCreateLessonPlanModalOpen}
         onOpenChange={setIsCreateLessonPlanModalOpen}
+      />
+      <DeleteLessonPlanModal
+        open={isDeleteLessonPlanModalOpen}
+        onOpenChange={(open) => {
+          setIsDeleteLessonPlanModalOpen(open);
+          if (!open) {
+            setSelectedLessonPlanForDelete(null);
+          }
+        }}
+        lessonPlanId={selectedLessonPlanForDelete?.id ?? null}
+        lessonPlanTitle={selectedLessonPlanForDelete?.title ?? null}
+      />
+      <EditLessonPlanTitleModal
+        open={isEditLessonPlanTitleModalOpen}
+        onOpenChange={(open) => {
+          setIsEditLessonPlanTitleModalOpen(open);
+          if (!open) {
+            setSelectedLessonPlanForEdit(null);
+          }
+        }}
+        lessonPlanId={selectedLessonPlanForEdit?.id ?? null}
+        initialTitle={selectedLessonPlanForEdit?.title ?? null}
       />
       <SidebarHeader className="p-4">
         <header className="flex items-center gap-2">

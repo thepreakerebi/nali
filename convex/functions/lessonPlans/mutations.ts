@@ -10,6 +10,7 @@ import {
   createValidationError,
   ActionableError,
 } from "../utils/errors";
+import { toTitleCase } from "../utils/string";
 
 /**
  * Create a new lesson plan
@@ -73,16 +74,21 @@ export const createLessonPlan = mutation({
       );
     }
 
-    // Create empty BlockNote content (default document structure)
-    const emptyContent = {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [],
+    // Create empty BlockNote content (array of blocks format)
+    // BlockNote stores content as an array of blocks
+    // BlockNote will generate IDs automatically when content is loaded into the editor
+    const emptyContent = [
+      {
+        type: "paragraph",
+        props: {
+          textColor: "default",
+          backgroundColor: "default",
+          textAlignment: "left",
         },
-      ],
-    };
+        content: [],
+        children: [],
+      },
+    ];
 
     try {
       // Insert lesson plan directly (mutations can't call internal mutations)
@@ -90,7 +96,7 @@ export const createLessonPlan = mutation({
         userId,
         classId: args.classId,
         subjectId: args.subjectId,
-        title: args.title.trim(),
+        title: toTitleCase(args.title.trim()),
         content: emptyContent,
       });
 
@@ -189,7 +195,7 @@ export const updateLessonPlan = mutation({
       embedding?: number[];
     } = {};
 
-    if (args.title !== undefined) updates.title = args.title.trim();
+    if (args.title !== undefined) updates.title = toTitleCase(args.title.trim());
     if (args.content !== undefined) updates.content = args.content;
     if (args.objectives !== undefined) updates.objectives = args.objectives;
     if (args.materials !== undefined) updates.materials = args.materials;
