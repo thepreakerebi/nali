@@ -13,6 +13,7 @@ import {
   SearchIcon,
   Plus,
   X,
+  Check,
 } from "lucide-react";
 import {
   Sidebar,
@@ -461,39 +462,67 @@ function AppSidebarContent() {
                       setSelectedClassId(undefined);
                       setSelectedSubjectId(undefined);
                     }}
+                    className={cn(
+                      !selectedClassId && !selectedSubjectId && "bg-accent"
+                    )}
                   >
-                    All Classes & Subjects
+                    <div className="flex items-center justify-between w-full">
+                      <span>All Classes & Subjects</span>
+                      {!selectedClassId && !selectedSubjectId && (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </div>
                   </DropdownMenuItem>
                   {classes && classes.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
-                      {classes.map((classItem) => (
-                        <DropdownMenuItem
-                          key={classItem._id}
-                          onClick={() => {
-                            setSelectedClassId(classItem._id);
-                            setSelectedSubjectId(undefined);
-                          }}
-                        >
-                          {classItem.name}
-                        </DropdownMenuItem>
-                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        Classes
+                      </div>
+                      {classes.map((classItem) => {
+                        const isSelected = selectedClassId === classItem._id;
+                        return (
+                          <DropdownMenuItem
+                            key={classItem._id}
+                            onClick={() => {
+                              setSelectedClassId(classItem._id);
+                              setSelectedSubjectId(undefined);
+                            }}
+                            className={cn(isSelected && "bg-accent")}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{classItem.name}</span>
+                              {isSelected && <Check className="h-4 w-4" />}
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </>
                   )}
                   {subjects && subjects.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
-                      {subjects.map((subject) => (
-                        <DropdownMenuItem
-                          key={subject._id}
-                          onClick={() => {
-                            setSelectedSubjectId(subject._id);
-                            setSelectedClassId(undefined);
-                          }}
-                        >
-                          {subject.name}
-                        </DropdownMenuItem>
-                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        Subjects
+                      </div>
+                      {subjects.map((subject) => {
+                        const isSelected = selectedSubjectId === subject._id;
+                        return (
+                          <DropdownMenuItem
+                            key={subject._id}
+                            onClick={() => {
+                              setSelectedSubjectId(subject._id);
+                              setSelectedClassId(undefined);
+                            }}
+                            className={cn(isSelected && "bg-accent")}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{subject.name}</span>
+                              {isSelected && <Check className="h-4 w-4" />}
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </>
                   )}
                 </DropdownMenuContent>
