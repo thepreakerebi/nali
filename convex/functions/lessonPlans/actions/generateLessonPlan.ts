@@ -254,8 +254,8 @@ export const generateLessonPlan = internalAction({
       };
 
       // Helper function to convert markdown tokens to inline content
-      const tokensToInlineContent = (tokens: Tokens.Generic[]): Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> => {
-        const result: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+      const tokensToInlineContent = (tokens: Tokens.Generic[]): Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> => {
+        const result: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
         
         for (const token of tokens) {
           if (token.type === "text") {
@@ -285,7 +285,16 @@ export const generateLessonPlan = internalAction({
             }
           } else if (token.type === "link") {
             const linkToken = token as Tokens.Link;
-            const href = linkToken.href;
+            let href = linkToken.href;
+            
+            // Remove utm_source and other tracking parameters
+            if (href.includes("?")) {
+              const [baseUrl, params] = href.split("?");
+              if (params) {
+                const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                href = baseUrl + (cleanParams ? "?" + cleanParams : "");
+              }
+            }
             
             // Check if it's a YouTube URL
             if (extractYouTubeId(href)) {
@@ -296,26 +305,17 @@ export const generateLessonPlan = internalAction({
                 result.push(child);
               }
             } else {
-              // Regular link - for simplicity, include URL in text
-              // BlockNote will handle link formatting on the frontend
+              // Regular link - BlockNote format: { type: "link", content: "text", href: "url" }
               const children = tokensToInlineContent(linkToken.tokens || []);
-              if (children.length > 0) {
-                // Push children and add URL reference
-                for (const child of children) {
-                  result.push({
-                    ...child,
-                    // Store href in a way BlockNote can use
-                    href: href,
-                  });
-                }
-              } else {
-                result.push({
-                  type: "text",
-                  text: href,
-                  styles: {},
-                  href: href,
-                });
-              }
+              const linkText = children.length > 0 
+                ? children.map(c => c.text || "").join("") 
+                : href;
+              
+              result.push({
+                type: "link",
+                content: linkText,
+                href: href,
+              } as { type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> });
             }
           } else if (token.type === "code") {
             const codeToken = token as Tokens.Code;
@@ -451,8 +451,60 @@ export const generateLessonPlan = internalAction({
             }
           }
           
+          // Check if paragraph starts with a section title (like "Learning Objectives", "Required Materials", etc.)
+          // These should be converted to headings
+          const sectionTitlePattern = /^(Learning Objectives|Required Materials and Resources|Instructional Methods|Assessment Activities|Assessment Criteria|References and Resources|References and Sources)/i;
+          const trimmedText = textContent.trim();
+          if (sectionTitlePattern.test(trimmedText)) {
+            // Extract the title and remaining content
+            const match = trimmedText.match(sectionTitlePattern);
+            if (match) {
+              const title = match[1];
+              const remainingContent = trimmedText.substring(match[0].length).trim();
+              
+              // Add as heading
+              blocknoteContent.push({
+                id: crypto.randomUUID(),
+                type: "heading",
+                props: {
+                  level: 2,
+                  textColor: "default",
+                  backgroundColor: "default",
+                  textAlignment: "left",
+                },
+                content: [{ type: "text", text: title, styles: {} }],
+                children: [],
+              } as Block);
+              
+              // If there's remaining content, add it as a paragraph
+              if (remainingContent.length > 0) {
+                const remainingInlineContent = tokensToInlineContent(paraToken.tokens || []);
+                // Remove the title part from inline content
+                const filteredContent = remainingInlineContent.filter(item => {
+                  const itemText = item.text || "";
+                  return !sectionTitlePattern.test(itemText);
+                });
+                
+                if (filteredContent.length > 0) {
+                  blocknoteContent.push({
+                    id: crypto.randomUUID(),
+                    type: "paragraph",
+                    props: {
+                      textColor: "default",
+                      backgroundColor: "default",
+                      textAlignment: "left",
+                    },
+                    content: filteredContent,
+                    children: [],
+                  } as Block);
+                }
+              }
+              continue;
+            }
+          }
+          
           // If tokens exist, use them; otherwise parse the text as markdown
-          let inlineContent: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+          let inlineContent: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
           
           if (paraToken.tokens && paraToken.tokens.length > 0) {
             inlineContent = tokensToInlineContent(paraToken.tokens);
@@ -472,6 +524,22 @@ export const generateLessonPlan = internalAction({
               inlineContent = [{ type: "text", text: textContent, styles: {} }];
             }
           }
+          
+          // Clean URLs in inline content to remove utm_source parameters
+          inlineContent = inlineContent.map(item => {
+            if (item.type === "link" && item.href) {
+              let cleanHref = item.href;
+              if (cleanHref.includes("?")) {
+                const [baseUrl, params] = cleanHref.split("?");
+                if (params) {
+                  const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                  cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                }
+              }
+              return { ...item, href: cleanHref };
+            }
+            return item;
+          });
           
           // Check if paragraph contains only a YouTube URL
           const youtubeUrlMatch = textContent.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s\)]+)/);
@@ -538,6 +606,22 @@ export const generateLessonPlan = internalAction({
               continue; // Skip empty or placeholder list items
             }
             
+            // Clean URLs in inline content to remove utm_source parameters
+            const cleanedInlineContent = inlineContent.map(item => {
+              if (item.type === "link" && item.href) {
+                let cleanHref = item.href;
+                if (cleanHref.includes("?")) {
+                  const [baseUrl, params] = cleanHref.split("?");
+                  if (params) {
+                    const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                    cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                  }
+                }
+                return { ...item, href: cleanHref };
+              }
+              return item;
+            });
+            
             blocknoteContent.push({
               id: crypto.randomUUID(),
               type: isOrdered ? "numberedListItem" : "bulletListItem",
@@ -546,7 +630,7 @@ export const generateLessonPlan = internalAction({
                 backgroundColor: "default",
                 textAlignment: "left",
               },
-              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: itemText || "", styles: {} }],
+              content: cleanedInlineContent.length > 0 ? cleanedInlineContent : [{ type: "text", text: itemText || "", styles: {} }],
               children: [],
             } as Block);
           }

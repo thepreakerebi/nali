@@ -119,7 +119,7 @@ export default function LessonPlanEditorPage() {
       {/* Editor */}
       <section
         className={cn(
-          "flex-1 overflow-auto p-6 bg-background transition-all duration-300",
+          "flex-1 overflow-auto px-6 md:px-32 py-6 bg-background transition-all duration-300",
           isGenerating && "generating-glow"
         )}
       >
