@@ -8,6 +8,7 @@ import {
   createNotFoundError,
   createAuthorizationError,
   createValidationError,
+  ActionableError,
 } from "../utils/errors";
 
 /**
@@ -84,22 +85,25 @@ export const createLessonPlan = mutation({
     };
 
     try {
-      // Use internal mutation to create the lesson plan
-      const lessonPlanId = await ctx.runMutation(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonPlans: { mutations: { createLessonPlan: unknown } } } }).functions.lessonPlans.mutations.createLessonPlan,
-        {
-          userId,
-          classId: args.classId,
-          subjectId: args.subjectId,
-          title: args.title.trim(),
-          content: emptyContent,
-        }
-      ) as Id<"lessonPlans">;
+      // Insert lesson plan directly (mutations can't call internal mutations)
+      const lessonPlanId = await ctx.db.insert("lessonPlans", {
+        userId,
+        classId: args.classId,
+        subjectId: args.subjectId,
+        title: args.title.trim(),
+        content: emptyContent,
+      });
 
       return lessonPlanId;
     } catch (error) {
       console.error("Error creating lesson plan:", error);
+      
+      // If it's already an ActionableError, re-throw it
+      if (error instanceof ActionableError) {
+        throw error;
+      }
+      
+      // Otherwise, wrap it in a validation error
       throw createValidationError(
         "lesson plan creation",
         "Failed to create lesson plan",

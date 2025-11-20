@@ -47,6 +47,11 @@
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
+  /* BlockNote editor theme variables */
+  --bn-colors-editor-background: oklch(1 0 0);
+  --bn-colors-editor-text: oklch(0.129 0.042 264.695);
+  --bn-colors-menu-background: oklch(1 0 0);
+  --bn-colors-menu-text: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
@@ -81,6 +86,11 @@
 .dark {
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
+  /* BlockNote editor theme variables for dark mode */
+  --bn-colors-editor-background: oklch(0.129 0.042 264.695);
+  --bn-colors-editor-text: oklch(0.984 0.003 247.858);
+  --bn-colors-menu-background: oklch(0.208 0.042 265.755);
+  --bn-colors-menu-text: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);
@@ -120,4 +130,48 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* BlockNote editor background - override CSS variables and direct styles */
+.bn-container {
+  --bn-colors-editor-background: var(--background) !important;
+  --bn-colors-editor-text: var(--foreground) !important;
+}
+
+.bn-container[data-color-scheme] {
+  --bn-colors-editor-background: var(--background) !important;
+  --bn-colors-editor-text: var(--foreground) !important;
+}
+
+.bn-container[data-color-scheme="light"] {
+  --bn-colors-editor-background: var(--background) !important;
+  --bn-colors-editor-text: var(--foreground) !important;
+}
+
+.bn-container[data-color-scheme="dark"] {
+  --bn-colors-editor-background: var(--background) !important;
+  --bn-colors-editor-text: var(--foreground) !important;
+}
+
+/* Direct override of editor background - highest specificity */
+.bn-container .bn-editor,
+.bn-container .bn-editor *,
+.bn-editor {
+  background-color: var(--background) !important;
+  background: var(--background) !important;
+}
+
+.bn-container,
+.bn-root,
+.bn-container > * {
+  background-color: var(--background) !important;
+  background: var(--background) !important;
+}
+
+/* Ensure BlockNote content area matches background */
+.bn-block-content,
+.bn-inline-content,
+.bn-block,
+.bn-block-group {
+  background-color: transparent !important;
 }
