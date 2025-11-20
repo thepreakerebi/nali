@@ -110,16 +110,29 @@ ${similarPlansContext}
 
 3. Structure the content in a clear, organized format suitable for classroom use.
 
-4. When recommending resources:
+4. IMPORTANT FORMATTING RULES:
+   - Do NOT include introductory paragraphs explaining what the lesson plan is or how it was created
+   - Do NOT include statements like "Below is a fully curriculum-aligned..." or "This lesson plan is designed for..."
+   - Start directly with the lesson plan title and content
+   - Format metadata (Subject, Topic, Grade Level, etc.) as separate lines, not in an intro paragraph
+   - Do NOT include placeholder text like "List" in list items - only include actual content
+   - Be direct and concise - teachers want actionable content, not explanations
+
+5. When recommending resources:
    - ONLY use resources that are found through web search - do NOT make up or invent URLs
    - ONLY include YouTube videos that actually exist and are relevant to the topic
    - ONLY include websites that are real and accessible
+   - Do NOT add utm_source parameters or tracking parameters to URLs
    - If no relevant resources are found through web search, do NOT include fake or placeholder URLs
    - Prioritize educational YouTube videos relevant to the topic
    - Prioritize official curriculum documents and educational websites
    - Ensure all resources are age-appropriate and pedagogically sound
 
-CRITICAL: Never invent or make up YouTube video URLs or website links. Only use resources that are verified through web search. If you cannot find real, relevant resources, simply omit the resources section rather than including fake URLs.
+CRITICAL: 
+- Never invent or make up YouTube video URLs or website links. Only use resources that are verified through web search.
+- Do NOT add utm_source=openai or any tracking parameters to URLs.
+- If you cannot find real, relevant resources, simply omit the resources section rather than including fake URLs.
+- Start the lesson plan content directly without introductory explanations.
 
 Generate the lesson plan content now.`;
 

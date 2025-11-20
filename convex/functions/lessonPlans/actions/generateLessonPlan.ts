@@ -150,16 +150,25 @@ export const generateLessonPlan = internalAction({
       // Try to get sources from result.sources (available when using generateText with web_search)
       if ("sources" in result && Array.isArray(result.sources)) {
         extractedResources = result.sources
-          .filter((source) => source.sourceType === "url" && "url" in source)
+          .filter((source) => {
+            if (source.sourceType !== "url" || !("url" in source)) {
+              return false;
+            }
+            const url = (source as { url: string }).url;
+            // Filter out URLs with utm_source parameters (AI-generated tracking)
+            return !url.includes("utm_source=");
+          })
           .map((source) => {
             const url = (source as { url: string; title?: string }).url;
             const title = (source as { url: string; title?: string }).title;
+            // Remove any utm parameters from URL
+            const cleanUrl = url.split("?")[0] + (url.includes("?") ? "?" + url.split("?")[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") : "");
             return {
-              type: url.includes("youtube.com") || url.includes("youtu.be") 
+              type: cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
                 ? "youtube" as const 
                 : "link" as const,
               title: title || "Untitled",
-              url,
+              url: cleanUrl,
               description: "",
             };
           });
@@ -175,15 +184,27 @@ export const generateLessonPlan = internalAction({
           const resultAny = toolResult as { result?: { sources?: Array<{ url?: string; title?: string }> } };
           if (resultAny.result?.sources && Array.isArray(resultAny.result.sources)) {
             extractedResources = resultAny.result.sources
-              .filter((source): source is { url: string; title?: string } => Boolean(source.url))
-              .map((source) => ({
-                type: source.url.includes("youtube.com") || source.url.includes("youtu.be") 
-                  ? "youtube" as const 
-                  : "link" as const,
-                title: source.title || "Untitled",
-                url: source.url,
-                description: "",
-              }));
+              .filter((source): source is { url: string; title?: string } => {
+                if (!source.url) return false;
+                // Filter out URLs with utm_source parameters (AI-generated tracking)
+                return !source.url.includes("utm_source=");
+              })
+              .map((source) => {
+                // Remove any utm parameters from URL
+                const urlParts = source.url.split("?");
+                const baseUrl = urlParts[0];
+                const params = urlParts[1] ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") : "";
+                const cleanUrl = baseUrl + (params ? "?" + params : "");
+                
+                return {
+                  type: cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
+                    ? "youtube" as const 
+                    : "link" as const,
+                  title: source.title || "Untitled",
+                  url: cleanUrl,
+                  description: "",
+                };
+              });
             break; // Use first web_search result
           }
         }
@@ -324,7 +345,8 @@ export const generateLessonPlan = internalAction({
           const headingToken = token as Tokens.Heading;
           const headingText = headingToken.text || "";
           // Check if this is a metadata heading (Subject, Topic, Grade Level, etc.)
-          const isMetadataField = /^(subject|topic|grade level|academic year|language):/i.test(headingText);
+          // Match patterns like "Subject: Mathematics" or "Subject:Mathematics"
+          const isMetadataField = /^(subject|topic|grade level|academic year|language|duration):\s*/i.test(headingText);
           
           if (isMetadataField) {
             consecutiveMetadataCount++;
@@ -347,6 +369,7 @@ export const generateLessonPlan = internalAction({
       
       // Second pass: convert tokens to blocks, combining metadata headings
       let metadataFields: string[] = [];
+      let metadataInserted = false;
       
       for (let i = 0; i < tempBlocks.length; i++) {
         const { token, isMetadata } = tempBlocks[i];
@@ -359,9 +382,9 @@ export const generateLessonPlan = internalAction({
           // Check if next block is also metadata
           const nextIsMetadata = i + 1 < tempBlocks.length && tempBlocks[i + 1].isMetadata;
           if (!nextIsMetadata) {
-            // Format all collected metadata as a single paragraph
+            // Format all collected metadata as a single paragraph and insert at the beginning
             const metadataText = metadataFields.join(" • ");
-            blocknoteContent.push({
+            blocknoteContent.unshift({
               id: crypto.randomUUID(),
               type: "paragraph",
               props: {
@@ -373,6 +396,7 @@ export const generateLessonPlan = internalAction({
               children: [],
             } as Block);
             metadataFields = [];
+            metadataInserted = true;
           }
         } else if (token.type === "heading") {
           // Non-metadata heading
@@ -396,11 +420,35 @@ export const generateLessonPlan = internalAction({
           const paraToken = token as Tokens.Paragraph;
           const textContent = paraToken.text || "";
           
-          // Skip paragraphs that contain the "international best practices" statement
-          if (textContent.toLowerCase().includes("international best practices") && 
-              textContent.toLowerCase().includes("culturally relevant context") &&
-              textContent.toLowerCase().includes("global perspective")) {
+          // Skip paragraphs that contain unwanted intro/explanation text
+          const lowerText = textContent.toLowerCase();
+          if (
+            (lowerText.includes("international best practices") && 
+             lowerText.includes("culturally relevant context") &&
+             lowerText.includes("global perspective")) ||
+            lowerText.includes("below is a fully curriculum-aligned") ||
+            lowerText.includes("this lesson plan is designed for immediate classroom use") ||
+            lowerText.includes("where real, publicly accessible resources were found") ||
+            lowerText.includes("no invented links are used") ||
+            (lowerText.includes("curriculum-aligned") && lowerText.includes("grade") && lowerText.includes("lesson plan"))
+          ) {
             continue; // Skip this paragraph
+          }
+          
+          // Check if paragraph contains metadata (Subject:, Topic:, etc.) - sometimes AI puts it in paragraphs
+          const metadataPattern = /^(subject|topic|grade level|academic year|language|duration):\s*/i;
+          if (metadataPattern.test(textContent.trim()) && !metadataInserted) {
+            // Extract metadata from paragraph and add to metadataFields
+            const lines = textContent.split(/\n/).filter(line => line.trim().length > 0);
+            for (const line of lines) {
+              if (metadataPattern.test(line.trim())) {
+                metadataFields.push(line.trim());
+              }
+            }
+            // If we collected metadata, skip this paragraph and will add it later
+            if (metadataFields.length > 0) {
+              continue;
+            }
           }
           
           // If tokens exist, use them; otherwise parse the text as markdown
@@ -484,6 +532,12 @@ export const generateLessonPlan = internalAction({
               }
             }
             
+            // Skip list items that just say "List" or are empty
+            const itemText = itemToken.text || "";
+            if (itemText.toLowerCase().trim() === "list" || itemText.trim().length === 0) {
+              continue; // Skip empty or placeholder list items
+            }
+            
             blocknoteContent.push({
               id: crypto.randomUUID(),
               type: isOrdered ? "numberedListItem" : "bulletListItem",
@@ -492,7 +546,7 @@ export const generateLessonPlan = internalAction({
                 backgroundColor: "default",
                 textAlignment: "left",
               },
-              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: "", styles: {} }],
+              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: itemText || "", styles: {} }],
               children: [],
             } as Block);
           }
@@ -525,8 +579,8 @@ export const generateLessonPlan = internalAction({
         }
       }
       
-      // If metadata fields were collected but not yet added, add them now
-      if (metadataFields.length > 0) {
+      // If metadata fields were collected but not yet added, add them now at the beginning
+      if (metadataFields.length > 0 && !metadataInserted) {
         const metadataText = metadataFields.join(" • ");
         blocknoteContent.unshift({
           id: crypto.randomUUID(),
@@ -546,6 +600,13 @@ export const generateLessonPlan = internalAction({
       const verifiedResources = (metadata.resources || []).filter((resource) => {
         // Only include resources with valid URLs from web search
         if (!resource.url || !resource.url.startsWith("http")) {
+          return false;
+        }
+        
+        // Filter out AI-generated URLs (those with utm_source=openai or similar patterns)
+        if (resource.url.includes("utm_source=openai") || 
+            resource.url.includes("?utm_source=") ||
+            resource.url.includes("&utm_source=")) {
           return false;
         }
         

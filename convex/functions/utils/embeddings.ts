@@ -1,31 +1,31 @@
 /**
- * Embedding generation utilities using Mistral AI
+ * Embedding generation utilities using OpenAI
  */
 
 "use node";
 
-import { mistral } from "@ai-sdk/mistral";
+import { openai } from "@ai-sdk/openai";
 import { embed } from "ai";
 
 /**
- * Generate embedding for text content using Mistral Embed
- * Returns a 1024-dimensional vector
+ * Generate embedding for text content using OpenAI text-embedding-3-small
+ * Returns a 1536-dimensional vector
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const mistralApiKey = process.env.MISTRAL_API_KEY;
-  if (!mistralApiKey) {
-    throw new Error("MISTRAL_API_KEY environment variable is not set");
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  if (!openaiApiKey) {
+    throw new Error("OPENAI_API_KEY environment variable is not set");
   }
 
   try {
     const { embedding } = await embed({
-      model: mistral.textEmbedding("mistral-embed"),
+      model: openai.textEmbedding("text-embedding-3-small"),
       value: text,
     });
 
-    if (!embedding || embedding.length !== 1024) {
+    if (!embedding || embedding.length === 0) {
       throw new Error(
-        `Invalid embedding dimension: expected 1024, got ${embedding.length}`
+        `Invalid embedding: got empty or invalid embedding`
       );
     }
 
