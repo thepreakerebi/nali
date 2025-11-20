@@ -1,10 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import * as React from "react";
 import Image from "next/image";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -12,6 +12,7 @@ import {
   FilterIcon,
   SearchIcon,
   Plus,
+  X,
 } from "lucide-react";
 import {
   Sidebar,
@@ -100,14 +101,101 @@ function AppSidebarContent() {
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
 
+  // Semantic search action
+  const semanticSearchAction = useAction(api.functions.actions.semanticSearch.semanticSearch);
+  const [semanticSearchResults, setSemanticSearchResults] = useState<Array<{
+    _id: Id<"lessonPlans">;
+    _creationTime: number;
+    userId: Id<"users">;
+    classId: Id<"classes">;
+    subjectId: Id<"subjects">;
+    title: string;
+    content: unknown;
+    objectives?: string[];
+    materials?: string[];
+    methods?: string[];
+    assessment?: string[];
+    references?: string[];
+    resources?: Array<{
+      type: "youtube" | "document" | "link";
+      title: string;
+      url: string;
+      description?: string;
+    }>;
+    similarityScore: number;
+    contentType: "lessonPlans";
+  }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Perform semantic search when search query changes
+  useEffect(() => {
+    const searchQuery = lessonPlanSearch.trim();
+    
+    if (!searchQuery) {
+      setSemanticSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Debounce search
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await semanticSearchAction({
+          query: searchQuery,
+          contentType: "lessonPlans",
+          classId: selectedClassId,
+          subjectId: selectedSubjectId,
+          limit: 20,
+        });
+        
+        // Filter to only lesson plans and type assert
+        const planResults = results.filter(
+          (r): r is typeof results[0] & { contentType: "lessonPlans" } =>
+            r.contentType === "lessonPlans"
+        );
+        setSemanticSearchResults(planResults);
+      } catch (error) {
+        console.error("Error performing semantic search:", error);
+        setSemanticSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [lessonPlanSearch, selectedClassId, selectedSubjectId, semanticSearchAction]);
+
   // Filter lesson plans by search
   const filteredLessonPlans = useMemo(() => {
     if (!lessonPlans) return [];
-    if (!lessonPlanSearch) return lessonPlans;
-    return lessonPlans.filter((plan) =>
-      plan.title.toLowerCase().includes(lessonPlanSearch.toLowerCase())
-    );
-  }, [lessonPlans, lessonPlanSearch]);
+    
+    const searchQuery = lessonPlanSearch.trim().toLowerCase();
+    
+    // If there's a search query, combine semantic search with title-based filtering
+    if (searchQuery) {
+      // First, get exact title matches (case-insensitive)
+      const titleMatches = lessonPlans.filter((plan) =>
+        plan.title.toLowerCase().includes(searchQuery)
+      );
+      
+      // Combine semantic search results with title matches
+      // Remove duplicates by _id
+      const combinedResults = [...titleMatches];
+      const titleMatchIds = new Set(titleMatches.map((p) => p._id));
+      
+      for (const semanticResult of semanticSearchResults) {
+        if (!titleMatchIds.has(semanticResult._id)) {
+          combinedResults.push(semanticResult);
+        }
+      }
+      
+      return combinedResults;
+    }
+    
+    // Otherwise, return all lesson plans
+    return lessonPlans;
+  }, [lessonPlans, lessonPlanSearch, semanticSearchResults]);
 
   // Filter lesson notes by search
   const filteredLessonNotes = useMemo(() => {
@@ -271,9 +359,23 @@ function AppSidebarContent() {
                   placeholder="Search plans..."
                   value={lessonPlanSearch}
                   onChange={(e) => setLessonPlanSearch(e.target.value)}
-                  className="pl-8 h-8 text-sm"
+                  className={cn("h-8 text-sm", lessonPlanSearch ? "pl-8 pr-8" : "pl-8")}
                   aria-label="Search lesson plans"
                 />
+                {lessonPlanSearch && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6 hover:bg-transparent"
+                    onClick={() => {
+                      setLessonPlanSearch("");
+                      setSemanticSearchResults([]);
+                    }}
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
               </section>
               {isMounted ? (
               <DropdownMenu>
@@ -334,14 +436,19 @@ function AppSidebarContent() {
 
             {/* Lesson Plans List */}
             <nav className="flex-1 min-h-0 overflow-y-auto text-left" aria-label="Lesson plans list">
-              {lessonPlans === undefined ? (
+              {isSearching ? (
+                <section className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </section>
+              ) : lessonPlans === undefined ? (
                 <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                 </section>
               ) : filteredLessonPlans.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">
-                  No lesson plans found
+                  {lessonPlanSearch.trim() ? "No lesson plans found matching your search" : "No lesson plans found"}
                 </p>
               ) : (
                 <ul className="space-y-1" role="list">
