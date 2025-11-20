@@ -126,8 +126,19 @@ function AppSidebarContent() {
     contentType: "lessonPlans";
   }>>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [semanticSearchNoteResults, setSemanticSearchNoteResults] = useState<Array<{
+    _id: Id<"lessonNotes">;
+    _creationTime: number;
+    userId: Id<"users">;
+    lessonPlanId: Id<"lessonPlans">;
+    title: string;
+    content: unknown;
+    similarityScore: number;
+    contentType: "lessonNotes";
+  }>>([]);
+  const [isSearchingNotes, setIsSearchingNotes] = useState(false);
 
-  // Perform semantic search when search query changes
+  // Perform semantic search when search query changes for lesson plans
   useEffect(() => {
     const searchQuery = lessonPlanSearch.trim();
     
@@ -166,6 +177,44 @@ function AppSidebarContent() {
     return () => clearTimeout(timeoutId);
   }, [lessonPlanSearch, selectedClassId, selectedSubjectId, semanticSearchAction]);
 
+  // Perform semantic search when search query changes for lesson notes
+  useEffect(() => {
+    const searchQuery = lessonNoteSearch.trim();
+    
+    if (!searchQuery) {
+      setSemanticSearchNoteResults([]);
+      setIsSearchingNotes(false);
+      return;
+    }
+
+    // Debounce search
+    const timeoutId = setTimeout(async () => {
+      setIsSearchingNotes(true);
+      try {
+        const results = await semanticSearchAction({
+          query: searchQuery,
+          contentType: "lessonNotes",
+          lessonPlanId: selectedLessonPlanId,
+          limit: 20,
+        });
+        
+        // Filter to only lesson notes and type assert
+        const noteResults = results.filter(
+          (r): r is typeof results[0] & { contentType: "lessonNotes" } =>
+            r.contentType === "lessonNotes"
+        );
+        setSemanticSearchNoteResults(noteResults);
+      } catch (error) {
+        console.error("Error performing semantic search for notes:", error);
+        setSemanticSearchNoteResults([]);
+      } finally {
+        setIsSearchingNotes(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [lessonNoteSearch, selectedLessonPlanId, semanticSearchAction]);
+
   // Filter lesson plans by search
   const filteredLessonPlans = useMemo(() => {
     if (!lessonPlans) return [];
@@ -200,11 +249,33 @@ function AppSidebarContent() {
   // Filter lesson notes by search
   const filteredLessonNotes = useMemo(() => {
     if (!lessonNotes) return [];
-    if (!lessonNoteSearch) return lessonNotes;
-    return lessonNotes.filter((note) =>
-      note.title.toLowerCase().includes(lessonNoteSearch.toLowerCase())
-    );
-  }, [lessonNotes, lessonNoteSearch]);
+    
+    const searchQuery = lessonNoteSearch.trim().toLowerCase();
+    
+    // If there's a search query, combine semantic search with title-based filtering
+    if (searchQuery) {
+      // First, get exact title matches (case-insensitive)
+      const titleMatches = lessonNotes.filter((note) =>
+        note.title.toLowerCase().includes(searchQuery)
+      );
+      
+      // Combine semantic search results with title matches
+      // Remove duplicates by _id
+      const combinedResults = [...titleMatches];
+      const titleMatchIds = new Set(titleMatches.map((n) => n._id));
+      
+      for (const semanticResult of semanticSearchNoteResults) {
+        if (!titleMatchIds.has(semanticResult._id)) {
+          combinedResults.push(semanticResult);
+        }
+      }
+      
+      return combinedResults;
+    }
+    
+    // Otherwise, return all lesson notes
+    return lessonNotes;
+  }, [lessonNotes, lessonNoteSearch, semanticSearchNoteResults]);
 
   const handleDeleteLessonPlan = (id: Id<"lessonPlans">) => {
     const plan = lessonPlans?.find((p) => p._id === id);
@@ -496,9 +567,23 @@ function AppSidebarContent() {
                   placeholder="Search notes..."
                   value={lessonNoteSearch}
                   onChange={(e) => setLessonNoteSearch(e.target.value)}
-                  className="pl-8 h-8 text-sm"
+                  className={cn("h-8 text-sm", lessonNoteSearch ? "pl-8 pr-8" : "pl-8")}
                   aria-label="Search lesson notes"
                 />
+                {lessonNoteSearch && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6 hover:bg-transparent"
+                    onClick={() => {
+                      setLessonNoteSearch("");
+                      setSemanticSearchNoteResults([]);
+                    }}
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
               </section>
               {isMounted ? (
               <DropdownMenu>
@@ -541,14 +626,19 @@ function AppSidebarContent() {
 
             {/* Lesson Notes List */}
             <nav className="flex-1 min-h-0 overflow-y-auto text-left" aria-label="Lesson notes list">
-              {lessonNotes === undefined ? (
+              {isSearchingNotes ? (
+                <section className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </section>
+              ) : lessonNotes === undefined ? (
                 <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                 </section>
               ) : filteredLessonNotes.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">
-                  No lesson notes found
+                  {lessonNoteSearch.trim() ? "No lesson notes found matching your search" : "No lesson notes found"}
                 </p>
               ) : (
                 <ul className="space-y-1" role="list">
