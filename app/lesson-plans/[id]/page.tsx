@@ -33,7 +33,7 @@ export default function LessonPlanEditorPage() {
     if (!content || !Array.isArray(content)) return false;
     
     // If content has only one empty paragraph, it's likely still generating
-    if (content.length === 1) {
+    if (content.length <= 1) {
       const firstBlock = content[0];
       if (
         firstBlock &&
@@ -42,7 +42,11 @@ export default function LessonPlanEditorPage() {
         firstBlock.type === "paragraph" &&
         "content" in firstBlock &&
         Array.isArray(firstBlock.content) &&
-        firstBlock.content.length === 0
+        (firstBlock.content.length === 0 || 
+         (firstBlock.content.length === 1 && 
+          typeof firstBlock.content[0] === "object" &&
+          "text" in firstBlock.content[0] &&
+          (!firstBlock.content[0].text || firstBlock.content[0].text.trim().length === 0)))
       ) {
         return true;
       }

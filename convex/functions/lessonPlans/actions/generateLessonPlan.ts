@@ -20,6 +20,9 @@ import {
 } from "../../prompts/lessonPlanGeneration";
 import { generateEmbedding } from "../../utils/embeddings";
 import { formatError } from "../../utils/errors";
+import { marked } from "marked";
+import type { Tokens } from "marked";
+import type { Block } from "@blocknote/core";
 
 // Schema for structured lesson plan metadata extraction
 const lessonPlanMetadataSchema = z.object({
@@ -214,89 +217,316 @@ export const generateLessonPlan = internalAction({
         };
       }
 
-      // Convert text to Blocknote JSON format
-      // Split by double newlines to create paragraphs
-      const paragraphs = fullText
-        .split(/\n\n+/)
-        .filter((p) => p.trim().length > 0);
+      // Helper function to extract YouTube video ID from URL
+      const extractYouTubeId = (url: string): string | null => {
+        const patterns = [
+          /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+          /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+        ];
+        for (const pattern of patterns) {
+          const match = url.match(pattern);
+          if (match && match[1]) {
+            return match[1];
+          }
+        }
+        return null;
+      };
 
-      const blocknoteContent = paragraphs.map((paragraph) => {
-        // Detect headings (lines starting with #)
-        const trimmed = paragraph.trim();
-        if (trimmed.startsWith("# ")) {
-          return {
+      // Helper function to convert markdown tokens to inline content
+      const tokensToInlineContent = (tokens: Tokens.Generic[]): Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> => {
+        const result: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+        
+        for (const token of tokens) {
+          if (token.type === "text") {
+            const textToken = token as Tokens.Text;
+            result.push({
+              type: "text",
+              text: textToken.text,
+              styles: {},
+            });
+          } else if (token.type === "strong") {
+            const strongToken = token as Tokens.Strong;
+            const children = tokensToInlineContent(strongToken.tokens || []);
+            for (const child of children) {
+              result.push({
+                ...child,
+                styles: { ...child.styles, bold: true },
+              });
+            }
+          } else if (token.type === "em") {
+            const emToken = token as Tokens.Em;
+            const children = tokensToInlineContent(emToken.tokens || []);
+            for (const child of children) {
+              result.push({
+                ...child,
+                styles: { ...child.styles, italic: true },
+              });
+            }
+          } else if (token.type === "link") {
+            const linkToken = token as Tokens.Link;
+            const href = linkToken.href;
+            
+            // Check if it's a YouTube URL
+            if (extractYouTubeId(href)) {
+              // YouTube links will be handled separately as video blocks at paragraph level
+              // Just push the link text for now
+              const children = tokensToInlineContent(linkToken.tokens || []);
+              for (const child of children) {
+                result.push(child);
+              }
+            } else {
+              // Regular link - for simplicity, include URL in text
+              // BlockNote will handle link formatting on the frontend
+              const children = tokensToInlineContent(linkToken.tokens || []);
+              if (children.length > 0) {
+                // Push children and add URL reference
+                for (const child of children) {
+                  result.push({
+                    ...child,
+                    // Store href in a way BlockNote can use
+                    href: href,
+                  });
+                }
+              } else {
+                result.push({
+                  type: "text",
+                  text: href,
+                  styles: {},
+                  href: href,
+                });
+              }
+            }
+          } else if (token.type === "code") {
+            const codeToken = token as Tokens.Code;
+            result.push({
+              type: "text",
+              text: codeToken.text,
+              styles: { code: true },
+            });
+          }
+        }
+        
+        return result;
+      };
+
+      // Parse markdown to tokens
+      const tokens = marked.lexer(fullText);
+      
+      // Convert tokens to BlockNote blocks
+      const blocknoteContent: Block[] = [];
+      
+      for (const token of tokens) {
+        if (token.type === "heading") {
+          const headingToken = token as Tokens.Heading;
+          const level = headingToken.depth;
+          const inlineContent = tokensToInlineContent(headingToken.tokens || []);
+          
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
             type: "heading",
             props: {
-              level: 1,
+              level: level as 1 | 2 | 3,
               textColor: "default",
               backgroundColor: "default",
               textAlignment: "left",
             },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(2),
-                styles: {},
-              },
-            ],
+            content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: "", styles: {} }],
             children: [],
-          };
-        } else if (trimmed.startsWith("## ")) {
-          return {
-            type: "heading",
+          } as Block);
+        } else if (token.type === "paragraph") {
+          const paraToken = token as Tokens.Paragraph;
+          const textContent = paraToken.text || "";
+          
+          // Skip paragraphs that contain the "international best practices" statement
+          if (textContent.toLowerCase().includes("international best practices") && 
+              textContent.toLowerCase().includes("culturally relevant context") &&
+              textContent.toLowerCase().includes("global perspective")) {
+            continue; // Skip this paragraph
+          }
+          
+          // If tokens exist, use them; otherwise parse the text as markdown
+          let inlineContent: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+          
+          if (paraToken.tokens && paraToken.tokens.length > 0) {
+            inlineContent = tokensToInlineContent(paraToken.tokens);
+          } else if (textContent.trim().length > 0) {
+            // Parse text that might contain markdown syntax
+            try {
+              const textTokens = marked.lexer(textContent);
+              if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                const textParaToken = textTokens[0] as Tokens.Paragraph;
+                inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+              } else {
+                // Fallback: just use the text
+                inlineContent = [{ type: "text", text: textContent, styles: {} }];
+              }
+            } catch {
+              // If parsing fails, use raw text
+              inlineContent = [{ type: "text", text: textContent, styles: {} }];
+            }
+          }
+          
+          // Check if paragraph contains only a YouTube URL
+          const youtubeUrlMatch = textContent.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s\)]+)/);
+          
+          if (youtubeUrlMatch && extractYouTubeId(youtubeUrlMatch[0])) {
+            // Create video block instead of paragraph
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: "video",
+              props: {
+                url: youtubeUrlMatch[0],
+                name: "",
+                caption: "",
+                showPreview: true,
+                previewWidth: 512,
+                textAlignment: "left",
+                backgroundColor: "default",
+              },
+              content: undefined,
+              children: [],
+            } as Block);
+          } else if (inlineContent.length > 0 || textContent.trim().length > 0) {
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: textContent || "", styles: {} }],
+              children: [],
+            } as Block);
+          }
+        } else if (token.type === "list") {
+          const listToken = token as Tokens.List;
+          const isOrdered = listToken.ordered;
+          
+          for (const item of listToken.items) {
+            const itemToken = item as Tokens.ListItem;
+            let inlineContent: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+            
+            // If tokens exist, use them; otherwise parse the text
+            if (itemToken.tokens && itemToken.tokens.length > 0) {
+              inlineContent = tokensToInlineContent(itemToken.tokens);
+            } else if (itemToken.text && itemToken.text.trim().length > 0) {
+              // Parse text that might contain markdown syntax
+              try {
+                const textTokens = marked.lexer(itemToken.text);
+                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                  const textParaToken = textTokens[0] as Tokens.Paragraph;
+                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                } else {
+                  inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                }
+              } catch {
+                inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+              }
+            }
+            
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: isOrdered ? "numberedListItem" : "bulletListItem",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: "", styles: {} }],
+              children: [],
+            } as Block);
+          }
+        } else if (token.type === "code") {
+          const codeToken = token as Tokens.Code;
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
+            type: "codeBlock",
             props: {
-              level: 2,
+              language: codeToken.lang || "",
               textColor: "default",
               backgroundColor: "default",
-              textAlignment: "left",
             },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(3),
-                styles: {},
-              },
-            ],
+            content: [{ type: "text", text: codeToken.text, styles: {} }],
             children: [],
-          };
-        } else if (trimmed.startsWith("### ")) {
-          return {
-            type: "heading",
-            props: {
-              level: 3,
-              textColor: "default",
-              backgroundColor: "default",
-              textAlignment: "left",
-            },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(4),
-                styles: {},
-              },
-            ],
-            children: [],
-          };
-        } else {
-          // Regular paragraph
-          return {
+          } as Block);
+        } else if (token.type === "hr") {
+          // Horizontal rule - skip or convert to paragraph with separator
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
             type: "paragraph",
             props: {
               textColor: "default",
               backgroundColor: "default",
               textAlignment: "left",
             },
-            content: [
-              {
-                type: "text",
-                text: trimmed,
-                styles: {},
-              },
-            ],
+            content: [{ type: "text", text: "---", styles: {} }],
             children: [],
-          };
+          } as Block);
         }
-      });
+      }
+
+      // Add resources (YouTube videos and websites) to the content
+      if (metadata.resources && metadata.resources.length > 0) {
+        // Find the "References and Sources" section or create it
+        let referencesIndex = -1;
+        for (let i = blocknoteContent.length - 1; i >= 0; i--) {
+          const block = blocknoteContent[i];
+          if (block.type === "heading" && 
+              block.content && 
+              Array.isArray(block.content) &&
+              block.content.length > 0 &&
+              typeof block.content[0] === "object" &&
+              "text" in block.content[0] &&
+              typeof block.content[0].text === "string" &&
+              block.content[0].text.toLowerCase().includes("references")) {
+            referencesIndex = i;
+            break;
+          }
+        }
+
+        // Add resources after references section or at the end
+        const insertIndex = referencesIndex >= 0 ? referencesIndex + 1 : blocknoteContent.length;
+
+        for (const resource of metadata.resources) {
+          if (resource.type === "youtube" && resource.url) {
+            // Add YouTube video block
+            blocknoteContent.splice(insertIndex, 0, {
+              id: crypto.randomUUID(),
+              type: "video",
+              props: {
+                url: resource.url,
+                name: resource.title || "",
+                caption: resource.description || "",
+                showPreview: true,
+                previewWidth: 512,
+                textAlignment: "left",
+                backgroundColor: "default",
+              },
+              content: undefined,
+              children: [],
+            } as Block);
+          } else if (resource.type === "link" && resource.url) {
+            // Add link as a paragraph with URL in text (can be converted to link in editor)
+            const linkText = resource.title ? `${resource.title}: ${resource.url}` : resource.url;
+            blocknoteContent.splice(insertIndex, 0, {
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [{
+                type: "text",
+                text: linkText,
+                styles: {},
+              }],
+              children: [],
+            } as Block);
+          }
+        }
+      }
 
       // Generate embedding for the lesson plan
       let embedding: number[];

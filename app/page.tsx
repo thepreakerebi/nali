@@ -303,7 +303,7 @@ export default function Home() {
         {/* Second Section - Classes and Subjects Tabs */}
         <section className="flex flex-col w-full gap-4">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "classes" | "subjects")} className="w-full">
-            <TabsList className="sticky top-0 z-10 bg-background border-b -mx-4">
+            <TabsList className="sticky w-full top-0 z-10 bg-background border-b -mx-4">
               <TabsTrigger value="classes">Classes</TabsTrigger>
               <TabsTrigger value="subjects">Subjects</TabsTrigger>
             </TabsList>
