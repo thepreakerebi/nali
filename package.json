@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/mistral": "^2.0.24",
+    "@ai-sdk/openai": "^2.0.69",
     "@base-ui-components/react": "^1.0.0-beta.6",
     "@blocknote/core": "^0.42.3",
     "@blocknote/mantine": "^0.42.3",

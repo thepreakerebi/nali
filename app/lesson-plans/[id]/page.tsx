@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { BlockNoteEditor } from "@/app/_components/BlockNoteEditor";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export default function LessonPlanEditorPage() {
   const params = useParams();
@@ -99,12 +100,12 @@ export default function LessonPlanEditorPage() {
         <p className="text-muted-foreground">
           The lesson plan you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
         </p>
-        <button
+        <Button
+          variant="outline"
           onClick={() => router.push("/")}
-          className="px-4 py-2 border rounded-md hover:bg-accent"
         >
           Back to Home
-        </button>
+          </Button>
       </main>
     );
   }

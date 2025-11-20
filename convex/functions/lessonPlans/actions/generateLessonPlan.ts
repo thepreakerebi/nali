@@ -6,7 +6,7 @@
 "use node";
 
 import { Experimental_Agent as Agent, stepCountIs } from "ai";
-import { mistral } from "@ai-sdk/mistral";
+import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { internalAction } from "../../../_generated/server";
@@ -18,29 +18,8 @@ import {
   getLessonPlanGenerationPrompt,
   LESSON_PLAN_EXTRACTION_PROMPT,
 } from "../../prompts/lessonPlanGeneration";
-import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumResources";
-import { createExtractResourceContentTool } from "../tools/extractResourceContent";
 import { generateEmbedding } from "../../utils/embeddings";
 import { formatError } from "../../utils/errors";
-
-interface ExtractedResource {
-  title: string;
-  url: string;
-  type: "youtube" | "document" | "link";
-  summary: string;
-  keyConcepts?: string[];
-  educationalValue?: string;
-  videoId?: string;
-  duration?: string;
-}
-
-interface FirecrawlSearchResult {
-  url: string;
-  title: string;
-  description: string;
-  position: number;
-  type: "youtube" | "document" | "link";
-}
 
 // Schema for structured lesson plan metadata extraction
 const lessonPlanMetadataSchema = z.object({
@@ -122,91 +101,21 @@ export const generateLessonPlan = internalAction({
       const country = args.country || userProfile?.country || undefined;
       const language = args.language || userProfile?.preferredLanguage || "en";
 
-      // Create tools
-      const searchCurriculumResources = createSearchCurriculumResourcesTool();
-      const extractResourceContent = createExtractResourceContentTool();
-
-      // Search for curriculum resources
-      let searchResults: {
-        resources: FirecrawlSearchResult[];
-        query: string;
-        totalFound: number;
-      } | null = null;
-
-      if (searchCurriculumResources && searchCurriculumResources.execute) {
-        // @ts-expect-error - tool execute signature varies by tool implementation
-        const result = await searchCurriculumResources.execute({
-          topic: args.topic,
-          subject: subjectDoc.name,
-          gradeLevel: classDoc.gradeLevel,
-          country: country,
-          region: args.region,
-          limit: 10,
-        });
-
-        if (result && "resources" in result && "totalFound" in result) {
-          searchResults = result as {
-            resources: FirecrawlSearchResult[];
-            query: string;
-            totalFound: number;
-          };
-        }
-      }
-
-      let curriculumResourcesContext = "";
-      let extractedResources: ExtractedResource[] = [];
-
-      if (searchResults && searchResults.resources && searchResults.resources.length > 0) {
-        // Extract content from top resources (limit to 5 for cost control)
-        const topResourceUrls = searchResults.resources
-          .slice(0, 5)
-          .map((r: FirecrawlSearchResult) => r.url);
-
-        try {
-          if (extractResourceContent && extractResourceContent.execute) {
-            // @ts-expect-error - tool execute signature varies by tool implementation
-            const extractResults = await extractResourceContent.execute({
-              urls: topResourceUrls,
-              topic: args.topic,
-              subject: subjectDoc.name,
-            });
-
-            if (
-              extractResults &&
-              "resources" in extractResults &&
-              Array.isArray(extractResults.resources)
-            ) {
-              extractedResources = extractResults.resources;
-            }
-          }
-          curriculumResourcesContext = extractedResources
-            .map(
-              (r: ExtractedResource) =>
-                `- ${r.title} (${r.type}): ${r.summary || r.educationalValue || ""}`
-            )
-            .join("\n");
-        } catch (error) {
-          console.error("Error extracting resource content:", error);
-          // Continue with basic resource info
-          curriculumResourcesContext = searchResults.resources
-            .slice(0, 5)
-            .map((r: FirecrawlSearchResult) => `- ${r.title}: ${r.description || ""}`)
-            .join("\n");
-        }
-      }
-
-      // Create agent with tools
+      // Create agent with OpenAI's built-in web search tool
+      // The agent will automatically search for curriculum resources as needed
       const agent = new Agent({
-        model: mistral("mistral-large-latest"),
+        model: openai("gpt-4o"),
         system: LESSON_PLAN_GENERATION_SYSTEM_PROMPT,
         tools: {
-          searchCurriculumResources,
-          extractResourceContent,
+          web_search: openai.tools.webSearch({
+            searchContextSize: "high", // Get comprehensive search results
+          }),
         },
         stopWhen: stepCountIs(15),
       });
 
       // Generate prompt
+      // The agent will use web search to find curriculum resources automatically
       const prompt = getLessonPlanGenerationPrompt({
         topic: args.topic,
         subject: subjectDoc.name,
@@ -216,7 +125,6 @@ export const generateLessonPlan = internalAction({
         country: country,
         region: args.region,
         language: language,
-        curriculumResources: curriculumResourcesContext,
       });
 
       // Execute agent and get result (non-streaming, like Shamp project)
@@ -227,31 +135,82 @@ export const generateLessonPlan = internalAction({
         throw new Error("Failed to generate lesson plan content");
       }
 
+      // Extract resources from web search results if available
+      // Check for sources in result.sources (if available) or extract from tool results in steps
+      let extractedResources: Array<{
+        type: "youtube" | "document" | "link";
+        title: string;
+        url: string;
+        description: string;
+      }> = [];
+
+      // Try to get sources from result.sources (available when using generateText with web_search)
+      if ("sources" in result && Array.isArray(result.sources)) {
+        extractedResources = result.sources
+          .filter((source) => source.sourceType === "url" && "url" in source)
+          .map((source) => {
+            const url = (source as { url: string; title?: string }).url;
+            const title = (source as { url: string; title?: string }).title;
+            return {
+              type: url.includes("youtube.com") || url.includes("youtu.be") 
+                ? "youtube" as const 
+                : "link" as const,
+              title: title || "Untitled",
+              url,
+              description: "",
+            };
+          });
+      } else {
+        // Extract URLs from tool results in steps (fallback for Agent)
+        // Agent steps may contain web_search tool results with sources
+        const toolResults = result.steps.flatMap((step) => {
+          const stepAny = step as { toolResults?: Array<{ toolName?: string; result?: { sources?: Array<{ url?: string; title?: string }> } }> };
+          return stepAny.toolResults?.filter((tr) => tr.toolName === "web_search") || [];
+        });
+        
+        for (const toolResult of toolResults) {
+          const resultAny = toolResult as { result?: { sources?: Array<{ url?: string; title?: string }> } };
+          if (resultAny.result?.sources && Array.isArray(resultAny.result.sources)) {
+            extractedResources = resultAny.result.sources
+              .filter((source): source is { url: string; title?: string } => Boolean(source.url))
+              .map((source) => ({
+                type: source.url.includes("youtube.com") || source.url.includes("youtu.be") 
+                  ? "youtube" as const 
+                  : "link" as const,
+                title: source.title || "Untitled",
+                url: source.url,
+                description: "",
+              }));
+            break; // Use first web_search result
+          }
+        }
+      }
+
       // Extract structured metadata from generated content
       let metadata;
       try {
         const extractionResult = await generateObject({
-          model: mistral("mistral-large-latest"),
+          model: openai("gpt-4o"),
           schema: lessonPlanMetadataSchema,
           prompt: `${LESSON_PLAN_EXTRACTION_PROMPT}\n\nLesson Plan Content:\n${fullText}`,
         });
 
         metadata = extractionResult.object;
+        
+        // Merge web search sources into resources if not already included
+        if (extractedResources.length > 0 && metadata.resources.length === 0) {
+          metadata.resources = extractedResources;
+        }
       } catch (error) {
         console.error("Error extracting metadata:", error);
-        // Use fallback metadata
+        // Use fallback metadata with web search sources
         metadata = {
           objectives: args.objectives || [],
           materials: [],
           methods: [],
           assessment: [],
           references: [],
-          resources: extractedResources.map((r: ExtractedResource) => ({
-            type: r.type || "link",
-            title: r.title || "Untitled",
-            url: r.url || "",
-            description: r.summary || r.educationalValue || "",
-          })),
+          resources: extractedResources,
         };
       }
 
@@ -359,9 +318,10 @@ export const generateLessonPlan = internalAction({
         
         // Update the lesson plan with generated content
         // Use internal mutation since we don't have auth context in scheduled actions
+        // Internal mutations are in mutations.ts and accessed via internal.functions.{module}.mutations.{name}
         await ctx.runMutation(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (internal as any).functions.lessonPlans.mutations.updateLessonPlan,
+          (internal as any).functions.lessonPlans.mutations.updateLessonPlanInternal,
           {
             lessonPlanId: args.lessonPlanId,
             content: blocknoteContent,
@@ -379,7 +339,7 @@ export const generateLessonPlan = internalAction({
           try {
             await ctx.runMutation(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (internal as any).functions.lessonPlans.mutations.updateEmbedding,
+              (internal as any).functions.lessonPlans.mutations.updateEmbeddingInternal,
               {
                 lessonPlanId: args.lessonPlanId,
                 embedding,

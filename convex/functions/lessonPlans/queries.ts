@@ -49,6 +49,12 @@ export const listLessonPlans = query({
     const classId = args.classId;
     const subjectId = args.subjectId;
 
+    // Helper function to exclude embedding field from results
+    const excludeEmbedding = (plan: any) => {
+      const { embedding, ...planWithoutEmbedding } = plan;
+      return planWithoutEmbedding;
+    };
+
     // Apply filters based on provided arguments
     if (classId && subjectId) {
       // Both filters: use compound index for class, filter subject in memory
@@ -60,32 +66,40 @@ export const listLessonPlans = query({
         .order("desc")
         .collect();
       
-      return plans.filter((plan) => plan.subjectId === subjectId);
+      return plans
+        .filter((plan) => plan.subjectId === subjectId)
+        .map(excludeEmbedding);
     } else if (classId) {
       // Filter by class only
-      return await ctx.db
+      const plans = await ctx.db
         .query("lessonPlans")
         .withIndex("by_user_id_and_class_id", (q) =>
           q.eq("userId", userId).eq("classId", classId)
         )
         .order("desc")
         .collect();
+      
+      return plans.map(excludeEmbedding);
     } else if (subjectId) {
       // Filter by subject only
-      return await ctx.db
+      const plans = await ctx.db
         .query("lessonPlans")
         .withIndex("by_user_id_and_subject_id", (q) =>
           q.eq("userId", userId).eq("subjectId", subjectId)
         )
         .order("desc")
         .collect();
+      
+      return plans.map(excludeEmbedding);
     } else {
       // No filters: use user index
-      return await ctx.db
+      const plans = await ctx.db
         .query("lessonPlans")
         .withIndex("by_user_id", (q) => q.eq("userId", userId))
         .order("desc")
         .collect();
+      
+      return plans.map(excludeEmbedding);
     }
   },
 });
@@ -159,7 +173,9 @@ export const getLessonPlan = query({
       return null;
     }
 
-    return lessonPlan;
+    // Exclude embedding field from response (not needed on frontend)
+    const { embedding, ...planWithoutEmbedding } = lessonPlan;
+    return planWithoutEmbedding;
   },
 });
 
