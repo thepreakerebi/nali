@@ -626,22 +626,36 @@ function AppSidebarContent() {
                     onClick={() => {
                       setSelectedLessonPlanId(undefined);
                     }}
+                    className={cn(!selectedLessonPlanId && "bg-accent")}
                   >
-                    All Lesson Plans
+                    <div className="flex items-center justify-between w-full">
+                      <span>All Lesson Plans</span>
+                      {!selectedLessonPlanId && <Check className="h-4 w-4" />}
+                    </div>
                   </DropdownMenuItem>
                   {lessonPlans && lessonPlans.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
-                      {lessonPlans.map((plan) => (
-                        <DropdownMenuItem
-                          key={plan._id}
-                          onClick={() => {
-                            setSelectedLessonPlanId(plan._id);
-                          }}
-                        >
-                          {plan.title}
-                        </DropdownMenuItem>
-                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        Lesson Plans
+                      </div>
+                      {lessonPlans.map((plan) => {
+                        const isSelected = selectedLessonPlanId === plan._id;
+                        return (
+                          <DropdownMenuItem
+                            key={plan._id}
+                            onClick={() => {
+                              setSelectedLessonPlanId(plan._id);
+                            }}
+                            className={cn(isSelected && "bg-accent")}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="truncate">{plan.title}</span>
+                              {isSelected && <Check className="h-4 w-4 shrink-0 ml-2" />}
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </>
                   )}
                 </DropdownMenuContent>
