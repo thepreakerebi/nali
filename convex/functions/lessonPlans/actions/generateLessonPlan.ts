@@ -315,8 +315,67 @@ export const generateLessonPlan = internalAction({
       // Convert tokens to BlockNote blocks
       const blocknoteContent: Block[] = [];
       
+      // First pass: collect all blocks, identifying metadata headings
+      const tempBlocks: Array<{ token: Tokens.Generic; isMetadata: boolean }> = [];
+      let consecutiveMetadataCount = 0;
+      
       for (const token of tokens) {
         if (token.type === "heading") {
+          const headingToken = token as Tokens.Heading;
+          const headingText = headingToken.text || "";
+          // Check if this is a metadata heading (Subject, Topic, Grade Level, etc.)
+          const isMetadataField = /^(subject|topic|grade level|academic year|language):/i.test(headingText);
+          
+          if (isMetadataField) {
+            consecutiveMetadataCount++;
+            tempBlocks.push({ token, isMetadata: true });
+          } else {
+            // If we had consecutive metadata, we've reached the end
+            if (consecutiveMetadataCount > 0) {
+              consecutiveMetadataCount = 0;
+            }
+            tempBlocks.push({ token, isMetadata: false });
+          }
+        } else {
+          // Non-heading token - if we had consecutive metadata, format it now
+          if (consecutiveMetadataCount > 0) {
+            consecutiveMetadataCount = 0;
+          }
+          tempBlocks.push({ token, isMetadata: false });
+        }
+      }
+      
+      // Second pass: convert tokens to blocks, combining metadata headings
+      let metadataFields: string[] = [];
+      
+      for (let i = 0; i < tempBlocks.length; i++) {
+        const { token, isMetadata } = tempBlocks[i];
+        
+        if (isMetadata && token.type === "heading") {
+          const headingToken = token as Tokens.Heading;
+          const headingText = headingToken.text || "";
+          metadataFields.push(headingText);
+          
+          // Check if next block is also metadata
+          const nextIsMetadata = i + 1 < tempBlocks.length && tempBlocks[i + 1].isMetadata;
+          if (!nextIsMetadata) {
+            // Format all collected metadata as a single paragraph
+            const metadataText = metadataFields.join(" • ");
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [{ type: "text", text: metadataText, styles: {} }],
+              children: [],
+            } as Block);
+            metadataFields = [];
+          }
+        } else if (token.type === "heading") {
+          // Non-metadata heading
           const headingToken = token as Tokens.Heading;
           const level = headingToken.depth;
           const inlineContent = tokensToInlineContent(headingToken.tokens || []);
@@ -465,9 +524,42 @@ export const generateLessonPlan = internalAction({
           } as Block);
         }
       }
+      
+      // If metadata fields were collected but not yet added, add them now
+      if (metadataFields.length > 0) {
+        const metadataText = metadataFields.join(" • ");
+        blocknoteContent.unshift({
+          id: crypto.randomUUID(),
+          type: "paragraph",
+          props: {
+            textColor: "default",
+            backgroundColor: "default",
+            textAlignment: "left",
+          },
+          content: [{ type: "text", text: metadataText, styles: {} }],
+          children: [],
+        } as Block);
+      }
 
-      // Add resources (YouTube videos and websites) to the content
-      if (metadata.resources && metadata.resources.length > 0) {
+      // Filter and add resources (YouTube videos and websites) to the content
+      // Only use resources that came from web search (have valid URLs)
+      const verifiedResources = (metadata.resources || []).filter((resource) => {
+        // Only include resources with valid URLs from web search
+        if (!resource.url || !resource.url.startsWith("http")) {
+          return false;
+        }
+        
+        // For YouTube, verify it's a real YouTube URL
+        if (resource.type === "youtube") {
+          const youtubeId = extractYouTubeId(resource.url);
+          return youtubeId !== null && youtubeId.length > 0;
+        }
+        
+        // For links, verify it's a valid URL
+        return resource.type === "link" && resource.url.length > 0;
+      });
+      
+      if (verifiedResources.length > 0) {
         // Find the "References and Sources" section or create it
         let referencesIndex = -1;
         for (let i = blocknoteContent.length - 1; i >= 0; i--) {
@@ -488,7 +580,7 @@ export const generateLessonPlan = internalAction({
         // Add resources after references section or at the end
         const insertIndex = referencesIndex >= 0 ? referencesIndex + 1 : blocknoteContent.length;
 
-        for (const resource of metadata.resources) {
+        for (const resource of verifiedResources) {
           if (resource.type === "youtube" && resource.url) {
             // Add YouTube video block
             blocknoteContent.splice(insertIndex, 0, {

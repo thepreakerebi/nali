@@ -23,9 +23,9 @@ export function BlockNoteEditor({ initialContent, onContentChange }: BlockNoteEd
     }
   }, [editorInstance]);
 
-  // Load initial content
+  // Load initial content and update when content changes
   useEffect(() => {
-    if (!editor || initialContent === undefined || hasLoadedContentRef.current) return;
+    if (!editor || initialContent === undefined) return;
 
     try {
       // BlockNote stores content as an array of blocks
@@ -47,10 +47,19 @@ export function BlockNoteEditor({ initialContent, onContentChange }: BlockNoteEd
         blocks = [];
       }
       
-      // Always replace blocks to ensure content is loaded
-      // BlockNote will handle empty arrays by showing a default paragraph
-      editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1]);
-      hasLoadedContentRef.current = true;
+      // Check if content has actually changed by comparing block IDs or content length
+      const currentBlocks = editor.document;
+      const hasChanged = 
+        currentBlocks.length !== blocks.length ||
+        JSON.stringify(currentBlocks.map(b => b.id)) !== JSON.stringify(blocks.map((b: any) => b?.id));
+      
+      // Only update if content has changed or hasn't been loaded yet
+      if (!hasLoadedContentRef.current || hasChanged) {
+        // Always replace blocks to ensure content is loaded/updated
+        // BlockNote will handle empty arrays by showing a default paragraph
+        editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1]);
+        hasLoadedContentRef.current = true;
+      }
     } catch (error) {
       console.error("Error loading content into editor:", error);
       hasLoadedContentRef.current = true;

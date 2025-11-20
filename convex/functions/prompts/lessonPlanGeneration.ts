@@ -110,10 +110,16 @@ ${similarPlansContext}
 
 3. Structure the content in a clear, organized format suitable for classroom use.
 
-4. When recommending resources, prioritize:
-   - Educational YouTube videos relevant to the topic
-   - Official curriculum documents and educational websites
-   - Age-appropriate and pedagogically sound materials
+4. When recommending resources:
+   - ONLY use resources that are found through web search - do NOT make up or invent URLs
+   - ONLY include YouTube videos that actually exist and are relevant to the topic
+   - ONLY include websites that are real and accessible
+   - If no relevant resources are found through web search, do NOT include fake or placeholder URLs
+   - Prioritize educational YouTube videos relevant to the topic
+   - Prioritize official curriculum documents and educational websites
+   - Ensure all resources are age-appropriate and pedagogically sound
+
+CRITICAL: Never invent or make up YouTube video URLs or website links. Only use resources that are verified through web search. If you cannot find real, relevant resources, simply omit the resources section rather than including fake URLs.
 
 Generate the lesson plan content now.`;
 
