@@ -204,7 +204,7 @@ function AppSidebarContent() {
         </SidebarGroup>
 
         {/* Lesson Plans Section */}
-        <SidebarGroup className="p-0 flex-1 flex flex-col">
+        <SidebarGroup className="p-0 flex-1 flex flex-col min-h-0">
           <header className="relative flex items-center justify-between px-2">
             <SidebarGroupLabel className="px-0 flex-1 text-sm font-bold">
               Lesson Plans
@@ -219,9 +219,9 @@ function AppSidebarContent() {
               <Plus className="h-8 w-8" />
             </Button>
           </header>
-          <SidebarGroupContent className="px-2 mt-3">
+          <SidebarGroupContent className="px-2 mt-3 flex-1 flex flex-col min-h-0">
             {/* Search and Filter */}
-            <section className="flex items-center gap-2 mb-2">
+            <section className="flex items-center gap-2 mb-2 shrink-0">
               <section className="relative flex-1">
                 <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
                 <Input
@@ -290,7 +290,7 @@ function AppSidebarContent() {
             </section>
 
             {/* Lesson Plans List */}
-            <nav className="flex-1 overflow-y-auto text-left" aria-label="Lesson plans list">
+            <nav className="flex-1 min-h-0 overflow-y-auto text-left" aria-label="Lesson plans list">
               {lessonPlans === undefined ? (
                 <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
@@ -322,7 +322,7 @@ function AppSidebarContent() {
         </SidebarGroup>
 
         {/* Lesson Notes Section */}
-        <SidebarGroup className="p-0 flex-1 flex flex-col">
+        <SidebarGroup className="p-0 flex-1 flex flex-col min-h-0">
           <header className="relative flex items-center justify-between px-2 h-8">
             <SidebarGroupLabel className="px-0 flex-1 text-sm font-bold">
               Lesson Notes
@@ -337,9 +337,9 @@ function AppSidebarContent() {
               <Plus className="h-4 w-4" />
             </Button>
           </header>
-          <SidebarGroupContent className="px-2 mt-3">
+          <SidebarGroupContent className="px-2 mt-3 flex-1 flex flex-col min-h-0">
             {/* Search and Filter */}
-            <section className="flex items-center gap-2 mb-2">
+            <section className="flex items-center gap-2 mb-2 shrink-0">
               <section className="relative flex-1">
                 <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
                 <Input
@@ -390,7 +390,7 @@ function AppSidebarContent() {
             </section>
 
             {/* Lesson Notes List */}
-            <nav className="flex-1 overflow-y-auto text-left" aria-label="Lesson notes list">
+            <nav className="flex-1 min-h-0 overflow-y-auto text-left" aria-label="Lesson notes list">
               {lessonNotes === undefined ? (
                 <section className="space-y-2">
                   <Skeleton className="h-8 w-full" />
