@@ -17,6 +17,7 @@ import type * as functions_lessonNotes_actions_updateEmbedding from "../function
 import type * as functions_lessonNotes_mutations from "../functions/lessonNotes/mutations.js";
 import type * as functions_lessonNotes_queries from "../functions/lessonNotes/queries.js";
 import type * as functions_lessonNotes_tools_searchSimilarNotes from "../functions/lessonNotes/tools/searchSimilarNotes.js";
+import type * as functions_lessonPlans_actions_blocknoteAI from "../functions/lessonPlans/actions/blocknoteAI.js";
 import type * as functions_lessonPlans_actions_generateLessonPlan from "../functions/lessonPlans/actions/generateLessonPlan.js";
 import type * as functions_lessonPlans_actions_generateLessonPlanStream from "../functions/lessonPlans/actions/generateLessonPlanStream.js";
 import type * as functions_lessonPlans_actions_updateEmbedding from "../functions/lessonPlans/actions/updateEmbedding.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   "functions/lessonNotes/mutations": typeof functions_lessonNotes_mutations;
   "functions/lessonNotes/queries": typeof functions_lessonNotes_queries;
   "functions/lessonNotes/tools/searchSimilarNotes": typeof functions_lessonNotes_tools_searchSimilarNotes;
+  "functions/lessonPlans/actions/blocknoteAI": typeof functions_lessonPlans_actions_blocknoteAI;
   "functions/lessonPlans/actions/generateLessonPlan": typeof functions_lessonPlans_actions_generateLessonPlan;
   "functions/lessonPlans/actions/generateLessonPlanStream": typeof functions_lessonPlans_actions_generateLessonPlanStream;
   "functions/lessonPlans/actions/updateEmbedding": typeof functions_lessonPlans_actions_updateEmbedding;
