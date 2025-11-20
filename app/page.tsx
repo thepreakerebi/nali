@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { GraduationCap, BookOpen, FileText, StickyNote, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -107,6 +108,17 @@ export default function Home() {
   // Fetch lists
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
+
+  // Show sign-in toast if user just signed in
+  useEffect(() => {
+    const justSignedIn = sessionStorage.getItem("justSignedIn");
+    if (justSignedIn === "true" && userProfile !== null && userProfile !== undefined) {
+      // Clear the flag
+      sessionStorage.removeItem("justSignedIn");
+      // Show toast on home page
+      toast.success("You're signed in");
+    }
+  }, [userProfile]);
 
   // Redirect immediately without rendering anything if onboarding not completed
   useEffect(() => {

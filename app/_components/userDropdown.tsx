@@ -46,8 +46,10 @@ export function UserDropdown() {
   const handleLogout = async () => {
     try {
       await signOut();
+      // Clear any sign-in flags
+      sessionStorage.removeItem("justSignedIn");
       router.push("/signin");
-      toast.success("Signed out successfully");
+      toast.success("You've logged out");
     } catch {
       toast.error("Failed to sign out");
     }

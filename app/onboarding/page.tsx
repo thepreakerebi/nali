@@ -100,6 +100,7 @@ export default function Onboarding() {
     if (userProfile) {
       if (userProfile.onboardingCompleted) {
         // Already completed onboarding, redirect to home
+        // The home page will handle showing the sign-in toast if needed
         router.push("/");
         return;
       }
