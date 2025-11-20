@@ -6,7 +6,7 @@
 "use node";
 
 import { Experimental_Agent as Agent, stepCountIs } from "ai";
-import { mistral } from "@ai-sdk/mistral";
+import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { internalAction } from "../../../_generated/server";
@@ -18,29 +18,12 @@ import {
   getLessonPlanGenerationPrompt,
   LESSON_PLAN_EXTRACTION_PROMPT,
 } from "../../prompts/lessonPlanGeneration";
-import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumResources";
-import { createExtractResourceContentTool } from "../tools/extractResourceContent";
 import { generateEmbedding } from "../../utils/embeddings";
 import { formatError } from "../../utils/errors";
-
-interface ExtractedResource {
-  title: string;
-  url: string;
-  type: "youtube" | "document" | "link";
-  summary: string;
-  keyConcepts?: string[];
-  educationalValue?: string;
-  videoId?: string;
-  duration?: string;
-}
-
-interface FirecrawlSearchResult {
-  url: string;
-  title: string;
-  description: string;
-  position: number;
-  type: "youtube" | "document" | "link";
-}
+import { marked } from "marked";
+import type { Tokens } from "marked";
+import type { Block } from "@blocknote/core";
+import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumResources";
 
 // Schema for structured lesson plan metadata extraction
 const lessonPlanMetadataSchema = z.object({
@@ -122,91 +105,19 @@ export const generateLessonPlan = internalAction({
       const country = args.country || userProfile?.country || undefined;
       const language = args.language || userProfile?.preferredLanguage || "en";
 
-      // Create tools
-      const searchCurriculumResources = createSearchCurriculumResourcesTool();
-      const extractResourceContent = createExtractResourceContentTool();
-
-      // Search for curriculum resources
-      let searchResults: {
-        resources: FirecrawlSearchResult[];
-        query: string;
-        totalFound: number;
-      } | null = null;
-
-      if (searchCurriculumResources && searchCurriculumResources.execute) {
-        // @ts-expect-error - tool execute signature varies by tool implementation
-        const result = await searchCurriculumResources.execute({
-          topic: args.topic,
-          subject: subjectDoc.name,
-          gradeLevel: classDoc.gradeLevel,
-          country: country,
-          region: args.region,
-          limit: 10,
-        });
-
-        if (result && "resources" in result && "totalFound" in result) {
-          searchResults = result as {
-            resources: FirecrawlSearchResult[];
-            query: string;
-            totalFound: number;
-          };
-        }
-      }
-
-      let curriculumResourcesContext = "";
-      let extractedResources: ExtractedResource[] = [];
-
-      if (searchResults && searchResults.resources && searchResults.resources.length > 0) {
-        // Extract content from top resources (limit to 5 for cost control)
-        const topResourceUrls = searchResults.resources
-          .slice(0, 5)
-          .map((r: FirecrawlSearchResult) => r.url);
-
-        try {
-          if (extractResourceContent && extractResourceContent.execute) {
-            // @ts-expect-error - tool execute signature varies by tool implementation
-            const extractResults = await extractResourceContent.execute({
-              urls: topResourceUrls,
-              topic: args.topic,
-              subject: subjectDoc.name,
-            });
-
-            if (
-              extractResults &&
-              "resources" in extractResults &&
-              Array.isArray(extractResults.resources)
-            ) {
-              extractedResources = extractResults.resources;
-            }
-          }
-          curriculumResourcesContext = extractedResources
-            .map(
-              (r: ExtractedResource) =>
-                `- ${r.title} (${r.type}): ${r.summary || r.educationalValue || ""}`
-            )
-            .join("\n");
-        } catch (error) {
-          console.error("Error extracting resource content:", error);
-          // Continue with basic resource info
-          curriculumResourcesContext = searchResults.resources
-            .slice(0, 5)
-            .map((r: FirecrawlSearchResult) => `- ${r.title}: ${r.description || ""}`)
-            .join("\n");
-        }
-      }
-
-      // Create agent with tools
+      // Create agent with Firecrawl search tool for curriculum resource discovery
+      // The agent will search for curriculum resources and use the results directly
       const agent = new Agent({
-        model: mistral("mistral-large-latest"),
+        model: openai("gpt-4o"),
         system: LESSON_PLAN_GENERATION_SYSTEM_PROMPT,
         tools: {
-          searchCurriculumResources,
-          extractResourceContent,
+          searchCurriculumResources: createSearchCurriculumResourcesTool(),
         },
         stopWhen: stepCountIs(15),
       });
 
       // Generate prompt
+      // The agent will use web search to find curriculum resources automatically
       const prompt = getLessonPlanGenerationPrompt({
         topic: args.topic,
         subject: subjectDoc.name,
@@ -216,7 +127,6 @@ export const generateLessonPlan = internalAction({
         country: country,
         region: args.region,
         language: language,
-        curriculumResources: curriculumResourcesContext,
       });
 
       // Execute agent and get result (non-streaming, like Shamp project)
@@ -227,117 +137,854 @@ export const generateLessonPlan = internalAction({
         throw new Error("Failed to generate lesson plan content");
       }
 
+      // Extract resources from Firecrawl search tool results
+      // Check tool results in agent steps for searchCurriculumResources
+      let extractedResources: Array<{
+        type: "youtube" | "document" | "link";
+        title: string;
+        url: string;
+        description: string;
+      }> = [];
+
+      // Extract resources from Firecrawl tool results in agent steps
+      const toolResults = result.steps.flatMap((step) => {
+        const stepAny = step as { 
+          toolResults?: Array<{ 
+            toolName?: string; 
+            result?: unknown;
+          }> 
+        };
+        return stepAny.toolResults || [];
+      });
+
+      // Process searchCurriculumResources tool results
+      const searchResults = toolResults.filter((tr) => tr.toolName === "searchCurriculumResources");
+      for (const searchResult of searchResults) {
+        // Check if result exists before accessing properties (following Shamp pattern)
+        if (!searchResult.result) {
+          continue;
+        }
+        
+        const resultAny = searchResult.result as { 
+          resources?: Array<{
+            url: string;
+            title: string;
+            description?: string;
+            type?: "youtube" | "document" | "link";
+          }>;
+        };
+        
+        if (resultAny?.resources && Array.isArray(resultAny.resources)) {
+          const resources = resultAny.resources
+            .filter((resource) => {
+              if (!resource.url) return false;
+              // Filter out URLs with utm_source parameters (AI-generated tracking)
+              return !resource.url.includes("utm_source=");
+            })
+            .map((resource) => {
+              // Remove any utm parameters from URL
+              const urlParts = resource.url.split("?");
+              const baseUrl = urlParts[0];
+              const params = urlParts[1] 
+                ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") 
+                : "";
+              const cleanUrl = baseUrl + (params ? "?" + params : "");
+              
+              return {
+                type: (resource.type || 
+                  (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
+                    ? "youtube" 
+                    : "link")) as "youtube" | "document" | "link",
+                title: resource.title || "Untitled",
+                url: cleanUrl,
+                description: resource.description || "",
+              };
+            });
+          
+          extractedResources.push(...resources);
+        }
+      }
+
+      // Remove duplicates based on URL
+      extractedResources = extractedResources.filter((resource, index, self) =>
+        index === self.findIndex((r) => r.url === resource.url)
+      );
+
       // Extract structured metadata from generated content
-      let metadata;
+      let metadata: {
+        objectives: string[];
+        materials: string[];
+        methods: string[];
+        assessment: string[];
+        references: string[];
+        resources: Array<{
+          type: "youtube" | "document" | "link";
+          title: string;
+          url: string;
+          description?: string;
+        }>;
+      };
+      
       try {
         const extractionResult = await generateObject({
-          model: mistral("mistral-large-latest"),
+          model: openai("gpt-4o"),
           schema: lessonPlanMetadataSchema,
           prompt: `${LESSON_PLAN_EXTRACTION_PROMPT}\n\nLesson Plan Content:\n${fullText}`,
         });
 
         metadata = extractionResult.object;
+        
+        // Ensure resources array exists
+        if (!metadata.resources) {
+          metadata.resources = [];
+        }
+        
+        // Merge Firecrawl tool sources into resources if not already included
+        if (extractedResources.length > 0 && metadata.resources.length === 0) {
+          metadata.resources = extractedResources;
+        } else if (extractedResources.length > 0 && metadata.resources.length > 0) {
+          // Merge extracted resources with metadata resources, avoiding duplicates
+          const existingUrls = new Set(metadata.resources.map((r: { url: string }) => r.url));
+          const newResources = extractedResources.filter((r) => !existingUrls.has(r.url));
+          metadata.resources = [...metadata.resources, ...newResources];
+        }
       } catch (error) {
         console.error("Error extracting metadata:", error);
-        // Use fallback metadata
+        // Use fallback metadata with Firecrawl tool sources
         metadata = {
           objectives: args.objectives || [],
           materials: [],
           methods: [],
           assessment: [],
           references: [],
-          resources: extractedResources.map((r: ExtractedResource) => ({
-            type: r.type || "link",
-            title: r.title || "Untitled",
-            url: r.url || "",
-            description: r.summary || r.educationalValue || "",
-          })),
+          resources: extractedResources || [],
         };
       }
+      
+      // Final safety check: ensure resources array always exists
+      if (!metadata.resources || !Array.isArray(metadata.resources)) {
+        metadata.resources = extractedResources || [];
+      }
 
-      // Convert text to Blocknote JSON format
-      // Split by double newlines to create paragraphs
-      const paragraphs = fullText
-        .split(/\n\n+/)
-        .filter((p) => p.trim().length > 0);
+      // Helper function to extract YouTube video ID from URL
+      const extractYouTubeId = (url: string): string | null => {
+        const patterns = [
+          /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+          /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+        ];
+        for (const pattern of patterns) {
+          const match = url.match(pattern);
+          if (match && match[1]) {
+            return match[1];
+          }
+        }
+        return null;
+      };
 
-      const blocknoteContent = paragraphs.map((paragraph) => {
-        // Detect headings (lines starting with #)
-        const trimmed = paragraph.trim();
-        if (trimmed.startsWith("# ")) {
-          return {
-            type: "heading",
-            props: {
-              level: 1,
-              textColor: "default",
-              backgroundColor: "default",
-              textAlignment: "left",
-            },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(2),
-                styles: {},
-              },
-            ],
-            children: [],
-          };
-        } else if (trimmed.startsWith("## ")) {
-          return {
-            type: "heading",
-            props: {
-              level: 2,
-              textColor: "default",
-              backgroundColor: "default",
-              textAlignment: "left",
-            },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(3),
-                styles: {},
-              },
-            ],
-            children: [],
-          };
-        } else if (trimmed.startsWith("### ")) {
-          return {
-            type: "heading",
-            props: {
-              level: 3,
-              textColor: "default",
-              backgroundColor: "default",
-              textAlignment: "left",
-            },
-            content: [
-              {
-                type: "text",
-                text: trimmed.substring(4),
-                styles: {},
-              },
-            ],
-            children: [],
-          };
+      // Helper function to convert markdown tokens to inline content
+      const tokensToInlineContent = (tokens: Tokens.Generic[]): Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> => {
+        // Return type allows both 'text' and 'content' properties for flexibility
+        const result: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
+        
+        for (const token of tokens) {
+          if (token.type === "text") {
+            const textToken = token as Tokens.Text;
+            result.push({
+              type: "text",
+              text: textToken.text,
+              styles: {},
+            });
+          } else if (token.type === "strong") {
+            const strongToken = token as Tokens.Strong;
+            const children = tokensToInlineContent(strongToken.tokens || []);
+            for (const child of children) {
+              result.push({
+                ...child,
+                styles: { ...child.styles, bold: true },
+              });
+            }
+          } else if (token.type === "em") {
+            const emToken = token as Tokens.Em;
+            const children = tokensToInlineContent(emToken.tokens || []);
+            for (const child of children) {
+              result.push({
+                ...child,
+                styles: { ...child.styles, italic: true },
+              });
+            }
+          } else if (token.type === "link") {
+            const linkToken = token as Tokens.Link;
+            let href = linkToken.href;
+            
+            // Remove utm_source and other tracking parameters
+            if (href.includes("?")) {
+              const [baseUrl, params] = href.split("?");
+              if (params) {
+                const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                href = baseUrl + (cleanParams ? "?" + cleanParams : "");
+              }
+            }
+            
+            // Check if it's a YouTube URL
+            if (extractYouTubeId(href)) {
+              // YouTube links will be handled separately as video blocks at paragraph level
+              // Just push the link text for now
+              const children = tokensToInlineContent(linkToken.tokens || []);
+              for (const child of children) {
+                result.push(child);
+              }
+            } else {
+              // Regular link - BlockNote format: { type: "link", content: "text", href: "url" }
+              const children = tokensToInlineContent(linkToken.tokens || []);
+              const linkText = children.length > 0 
+                ? children.map(c => (c.type === "text" ? c.text : c.content || "")).join("") 
+                : href;
+              
+              // Clean URL to remove utm parameters
+              let cleanHref = href;
+              if (cleanHref.includes("?")) {
+                const [baseUrl, params] = cleanHref.split("?");
+                if (params) {
+                  const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                  cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                }
+              }
+              
+              result.push({
+                type: "link",
+                content: linkText || cleanHref,
+                href: cleanHref,
+              } as { type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> });
+            }
+          } else if (token.type === "code") {
+            const codeToken = token as Tokens.Code;
+            result.push({
+              type: "text",
+              text: codeToken.text,
+              styles: { code: true },
+            });
+          }
+        }
+        
+        return result;
+      };
+
+      // Parse markdown to tokens
+      const tokens = marked.lexer(fullText);
+      
+      // Convert tokens to BlockNote blocks
+      const blocknoteContent: Block[] = [];
+      
+      // First pass: collect all blocks, identifying metadata headings
+      const tempBlocks: Array<{ token: Tokens.Generic; isMetadata: boolean }> = [];
+      let consecutiveMetadataCount = 0;
+      
+      for (const token of tokens) {
+        if (token.type === "heading") {
+          const headingToken = token as Tokens.Heading;
+          const headingText = headingToken.text || "";
+          // Check if this is a metadata heading (Subject, Topic, Grade Level, etc.)
+          // Match patterns like "Subject: Mathematics" or "Subject:Mathematics"
+          const isMetadataField = /^(subject|topic|grade level|academic year|language|duration):\s*/i.test(headingText);
+          
+          if (isMetadataField) {
+            consecutiveMetadataCount++;
+            tempBlocks.push({ token, isMetadata: true });
+          } else {
+            // If we had consecutive metadata, we've reached the end
+            if (consecutiveMetadataCount > 0) {
+              consecutiveMetadataCount = 0;
+            }
+            tempBlocks.push({ token, isMetadata: false });
+          }
         } else {
-          // Regular paragraph
-          return {
+          // Non-heading token - if we had consecutive metadata, format it now
+          if (consecutiveMetadataCount > 0) {
+            consecutiveMetadataCount = 0;
+          }
+          tempBlocks.push({ token, isMetadata: false });
+        }
+      }
+      
+      // Second pass: convert tokens to blocks, combining metadata headings
+      let metadataFields: string[] = [];
+      let metadataInserted = false;
+      
+      for (let i = 0; i < tempBlocks.length; i++) {
+        const { token, isMetadata } = tempBlocks[i];
+        
+        if (isMetadata && token.type === "heading") {
+          const headingToken = token as Tokens.Heading;
+          const headingText = headingToken.text || "";
+          metadataFields.push(headingText);
+          
+          // Check if next block is also metadata
+          const nextIsMetadata = i + 1 < tempBlocks.length && tempBlocks[i + 1].isMetadata;
+          if (!nextIsMetadata) {
+            // Format all collected metadata as a single paragraph and insert at the beginning
+            const metadataText = metadataFields.join(" • ");
+            blocknoteContent.unshift({
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [{ type: "text", text: metadataText, styles: {} }],
+              children: [],
+            } as Block);
+            metadataFields = [];
+            metadataInserted = true;
+          }
+        } else if (token.type === "heading") {
+          // Non-metadata heading
+          const headingToken = token as Tokens.Heading;
+          const level = headingToken.depth;
+          const inlineContent = tokensToInlineContent(headingToken.tokens || []);
+          
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
+            type: "heading",
+            props: {
+              level: level as 1 | 2 | 3,
+              textColor: "default",
+              backgroundColor: "default",
+              textAlignment: "left",
+            },
+            content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: "", styles: {} }],
+            children: [],
+          } as Block);
+        } else if (token.type === "paragraph") {
+          const paraToken = token as Tokens.Paragraph;
+          const textContent = paraToken.text || "";
+          
+          // Skip paragraphs that contain unwanted intro/explanation text
+          const lowerText = textContent.toLowerCase();
+          if (
+            (lowerText.includes("international best practices") && 
+             lowerText.includes("culturally relevant context") &&
+             lowerText.includes("global perspective")) ||
+            lowerText.includes("below is a fully curriculum-aligned") ||
+            lowerText.includes("this lesson plan is designed for immediate classroom use") ||
+            lowerText.includes("where real, publicly accessible resources were found") ||
+            lowerText.includes("no invented links are used") ||
+            (lowerText.includes("curriculum-aligned") && lowerText.includes("grade") && lowerText.includes("lesson plan"))
+          ) {
+            continue; // Skip this paragraph
+          }
+          
+          // Check if paragraph contains metadata (Subject:, Topic:, etc.) - sometimes AI puts it in paragraphs
+          const metadataPattern = /^(subject|topic|grade level|academic year|language|duration):\s*/i;
+          if (metadataPattern.test(textContent.trim()) && !metadataInserted) {
+            // Extract metadata from paragraph and add to metadataFields
+            const lines = textContent.split(/\n/).filter(line => line.trim().length > 0);
+            for (const line of lines) {
+              if (metadataPattern.test(line.trim())) {
+                metadataFields.push(line.trim());
+              }
+            }
+            // If we collected metadata, skip this paragraph and will add it later
+            if (metadataFields.length > 0) {
+              continue;
+            }
+          }
+          
+          // Check if paragraph starts with a section title (like "Learning Objectives", "Required Materials", etc.)
+          // These should be converted to headings
+          const sectionTitlePattern = /^(Learning Objectives|Required Materials and Resources|Instructional Methods|Assessment Activities|Assessment Criteria|References and Resources|References and Sources)/i;
+          const trimmedText = textContent.trim();
+          if (sectionTitlePattern.test(trimmedText)) {
+            // Extract the title and remaining content
+            const match = trimmedText.match(sectionTitlePattern);
+            if (match) {
+              const title = match[1];
+              const remainingContent = trimmedText.substring(match[0].length).trim();
+              
+              // Add as heading
+              blocknoteContent.push({
+                id: crypto.randomUUID(),
+                type: "heading",
+                props: {
+                  level: 2,
+                  textColor: "default",
+                  backgroundColor: "default",
+                  textAlignment: "left",
+                },
+                content: [{ type: "text", text: title, styles: {} }],
+                children: [],
+              } as Block);
+              
+              // If there's remaining content, add it as a paragraph
+              if (remainingContent.length > 0) {
+                const remainingInlineContent = tokensToInlineContent(paraToken.tokens || []);
+                // Remove the title part from inline content
+                const filteredContent = remainingInlineContent.filter(item => {
+                  const itemText = item.text || "";
+                  return !sectionTitlePattern.test(itemText);
+                });
+                
+                if (filteredContent.length > 0) {
+                  blocknoteContent.push({
+                    id: crypto.randomUUID(),
+                    type: "paragraph",
+                    props: {
+                      textColor: "default",
+                      backgroundColor: "default",
+                      textAlignment: "left",
+                    },
+                    content: filteredContent,
+                    children: [],
+                  } as Block);
+                }
+              }
+              continue;
+            }
+          }
+          
+          // If tokens exist, use them; otherwise parse the text as markdown
+          let inlineContent: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
+          
+          if (paraToken.tokens && paraToken.tokens.length > 0) {
+            inlineContent = tokensToInlineContent(paraToken.tokens);
+          } else if (textContent.trim().length > 0) {
+            // Check if text contains markdown links [text](url) that weren't parsed
+            const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+            const hasMarkdownLinks = markdownLinkRegex.test(textContent);
+            
+            if (hasMarkdownLinks) {
+              // Re-parse the entire text to catch markdown links
+              try {
+                const textTokens = marked.lexer(textContent);
+                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                  const textParaToken = textTokens[0] as Tokens.Paragraph;
+                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                } else {
+                  // Try parsing as inline markdown
+                  const inlineTokens = marked.lexer(textContent);
+                  if (inlineTokens.length > 0) {
+                    for (const token of inlineTokens) {
+                      if (token.type === "paragraph") {
+                        const paraToken = token as Tokens.Paragraph;
+                        inlineContent = tokensToInlineContent(paraToken.tokens || []);
+                        break;
+                      }
+                    }
+                  }
+                  // Fallback: manually parse markdown links
+                  if (inlineContent.length === 0) {
+                    let lastIndex = 0;
+                    markdownLinkRegex.lastIndex = 0; // Reset regex
+                    let match;
+                    while ((match = markdownLinkRegex.exec(textContent)) !== null) {
+                      // Add text before link
+                      if (match.index > lastIndex) {
+                        const beforeText = textContent.substring(lastIndex, match.index);
+                        if (beforeText.trim()) {
+                          inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                        }
+                      }
+                      // Add link
+                      const linkText = match[1];
+                      let linkUrl = match[2];
+                      // Clean URL
+                      if (linkUrl.includes("?")) {
+                        const [baseUrl, params] = linkUrl.split("?");
+                        if (params) {
+                          const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                          linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                        }
+                      }
+                      inlineContent.push({
+                        type: "link",
+                        content: linkText,
+                        href: linkUrl,
+                      });
+                      lastIndex = markdownLinkRegex.lastIndex;
+                    }
+                    // Add remaining text
+                    if (lastIndex < textContent.length) {
+                      const remainingText = textContent.substring(lastIndex);
+                      if (remainingText.trim()) {
+                        inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // If parsing fails, try manual link extraction
+                try {
+                  let lastIndex = 0;
+                  markdownLinkRegex.lastIndex = 0;
+                  let match;
+                  while ((match = markdownLinkRegex.exec(textContent)) !== null) {
+                    if (match.index > lastIndex) {
+                      const beforeText = textContent.substring(lastIndex, match.index);
+                      if (beforeText.trim()) {
+                        inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                      }
+                    }
+                    let linkUrl = match[2];
+                    if (linkUrl.includes("?")) {
+                      const [baseUrl, params] = linkUrl.split("?");
+                      if (params) {
+                        const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                        linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                      }
+                    }
+                    inlineContent.push({
+                      type: "link",
+                      content: match[1],
+                      href: linkUrl,
+                    });
+                    lastIndex = markdownLinkRegex.lastIndex;
+                  }
+                  if (lastIndex < textContent.length) {
+                    const remainingText = textContent.substring(lastIndex);
+                    if (remainingText.trim()) {
+                      inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                    }
+                  }
+                } catch {
+                  inlineContent = [{ type: "text", text: textContent, styles: {} }];
+                }
+              }
+            } else {
+              // Parse text that might contain markdown syntax (bold, italic, etc.)
+              try {
+                const textTokens = marked.lexer(textContent);
+                if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                  const textParaToken = textTokens[0] as Tokens.Paragraph;
+                  inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                } else {
+                  // Fallback: just use the text
+                  inlineContent = [{ type: "text", text: textContent, styles: {} }];
+                }
+              } catch {
+                // If parsing fails, use raw text
+                inlineContent = [{ type: "text", text: textContent, styles: {} }];
+              }
+            }
+          }
+          
+          // Clean URLs in inline content to remove utm_source parameters and ensure correct format
+          inlineContent = inlineContent.map(item => {
+            if (item.type === "link" && item.href) {
+              let cleanHref = item.href;
+              if (cleanHref.includes("?")) {
+                const [baseUrl, params] = cleanHref.split("?");
+                if (params) {
+                  const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                  cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                }
+              }
+              // Ensure BlockNote link format: { type: "link", content: "text", href: "url" }
+              return { 
+                type: "link", 
+                content: item.content || item.text || cleanHref, 
+                href: cleanHref 
+              };
+            }
+            // Ensure text items have correct format
+            if (item.type === "text") {
+              return { type: "text", text: item.text || item.content || "", styles: item.styles || {} };
+            }
+            return item;
+          });
+          
+          // Check if paragraph contains only a YouTube URL
+          const youtubeUrlMatch = textContent.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s\)]+)/);
+          
+          if (youtubeUrlMatch && extractYouTubeId(youtubeUrlMatch[0])) {
+            // Create video block instead of paragraph
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: "video",
+              props: {
+                url: youtubeUrlMatch[0],
+                name: "",
+                caption: "",
+                showPreview: true,
+                previewWidth: 512,
+                textAlignment: "left",
+                backgroundColor: "default",
+              },
+              content: undefined,
+              children: [],
+            } as Block);
+          } else if (inlineContent.length > 0 || textContent.trim().length > 0) {
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: inlineContent.length > 0 ? inlineContent : [{ type: "text", text: textContent || "", styles: {} }],
+              children: [],
+            } as Block);
+          }
+        } else if (token.type === "list") {
+          const listToken = token as Tokens.List;
+          const isOrdered = listToken.ordered;
+          
+          for (const item of listToken.items) {
+            const itemToken = item as Tokens.ListItem;
+            let inlineContent: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
+            
+            // If tokens exist, use them; otherwise parse the text
+            if (itemToken.tokens && itemToken.tokens.length > 0) {
+              inlineContent = tokensToInlineContent(itemToken.tokens);
+            } else if (itemToken.text && itemToken.text.trim().length > 0) {
+              // Check if text contains markdown links [text](url) that weren't parsed
+              const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+              const hasMarkdownLinks = markdownLinkRegex.test(itemToken.text);
+              
+              if (hasMarkdownLinks) {
+                // Re-parse the entire text to catch markdown links
+                try {
+                  const textTokens = marked.lexer(itemToken.text);
+                  if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                    const textParaToken = textTokens[0] as Tokens.Paragraph;
+                    inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                  } else {
+                    // Try manual link extraction
+                    let lastIndex = 0;
+                    markdownLinkRegex.lastIndex = 0;
+                    let match;
+                    while ((match = markdownLinkRegex.exec(itemToken.text)) !== null) {
+                      if (match.index > lastIndex) {
+                        const beforeText = itemToken.text.substring(lastIndex, match.index);
+                        if (beforeText.trim()) {
+                          inlineContent.push({ type: "text", text: beforeText, styles: {} });
+                        }
+                      }
+                      let linkUrl = match[2];
+                      if (linkUrl.includes("?")) {
+                        const [baseUrl, params] = linkUrl.split("?");
+                        if (params) {
+                          const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                          linkUrl = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                        }
+                      }
+                      inlineContent.push({
+                        type: "link",
+                        content: match[1],
+                        href: linkUrl,
+                      });
+                      lastIndex = markdownLinkRegex.lastIndex;
+                    }
+                    if (lastIndex < itemToken.text.length) {
+                      const remainingText = itemToken.text.substring(lastIndex);
+                      if (remainingText.trim()) {
+                        inlineContent.push({ type: "text", text: remainingText, styles: {} });
+                      }
+                    }
+                  }
+                } catch {
+                  // Fallback: parse as regular markdown
+                  try {
+                    const textTokens = marked.lexer(itemToken.text);
+                    if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                      const textParaToken = textTokens[0] as Tokens.Paragraph;
+                      inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                    } else {
+                      inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                    }
+                  } catch {
+                    inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                  }
+                }
+              } else {
+                // Parse text that might contain markdown syntax (bold, italic, etc.)
+                try {
+                  const textTokens = marked.lexer(itemToken.text);
+                  if (textTokens.length > 0 && textTokens[0].type === "paragraph") {
+                    const textParaToken = textTokens[0] as Tokens.Paragraph;
+                    inlineContent = tokensToInlineContent(textParaToken.tokens || []);
+                  } else {
+                    inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                  }
+                } catch {
+                  inlineContent = [{ type: "text", text: itemToken.text, styles: {} }];
+                }
+              }
+            }
+            
+            // Skip list items that just say "List" or are empty
+            const itemText = itemToken.text || "";
+            if (itemText.toLowerCase().trim() === "list" || itemText.trim().length === 0) {
+              continue; // Skip empty or placeholder list items
+            }
+            
+            // Clean URLs in inline content to remove utm_source parameters and ensure correct format
+            const cleanedInlineContent = inlineContent.map(item => {
+              if (item.type === "link" && item.href) {
+                let cleanHref = item.href;
+                if (cleanHref.includes("?")) {
+                  const [baseUrl, params] = cleanHref.split("?");
+                  if (params) {
+                    const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                    cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                  }
+                }
+                // Ensure BlockNote link format: { type: "link", content: "text", href: "url" }
+                return { 
+                  type: "link", 
+                  content: item.content || item.text || cleanHref, 
+                  href: cleanHref 
+                };
+              }
+              // Ensure text items have correct format
+              if (item.type === "text") {
+                return { type: "text", text: item.text || item.content || "", styles: item.styles || {} };
+              }
+              return item;
+            });
+            
+            blocknoteContent.push({
+              id: crypto.randomUUID(),
+              type: isOrdered ? "numberedListItem" : "bulletListItem",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: cleanedInlineContent.length > 0 ? cleanedInlineContent : [{ type: "text", text: itemText || "", styles: {} }],
+              children: [],
+            } as Block);
+          }
+        } else if (token.type === "code") {
+          const codeToken = token as Tokens.Code;
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
+            type: "codeBlock",
+            props: {
+              language: codeToken.lang || "",
+              textColor: "default",
+              backgroundColor: "default",
+            },
+            content: [{ type: "text", text: codeToken.text, styles: {} }],
+            children: [],
+          } as Block);
+        } else if (token.type === "hr") {
+          // Horizontal rule - skip or convert to paragraph with separator
+          blocknoteContent.push({
+            id: crypto.randomUUID(),
             type: "paragraph",
             props: {
               textColor: "default",
               backgroundColor: "default",
               textAlignment: "left",
             },
-            content: [
-              {
-                type: "text",
-                text: trimmed,
-                styles: {},
-              },
-            ],
+            content: [{ type: "text", text: "---", styles: {} }],
             children: [],
-          };
+          } as Block);
         }
+      }
+      
+      // If metadata fields were collected but not yet added, add them now at the beginning
+      if (metadataFields.length > 0 && !metadataInserted) {
+        const metadataText = metadataFields.join(" • ");
+        blocknoteContent.unshift({
+          id: crypto.randomUUID(),
+          type: "paragraph",
+          props: {
+            textColor: "default",
+            backgroundColor: "default",
+            textAlignment: "left",
+          },
+          content: [{ type: "text", text: metadataText, styles: {} }],
+          children: [],
+        } as Block);
+      }
+
+      // Filter and add resources (YouTube videos and websites) to the content
+      // Only use resources that came from web search (have valid URLs)
+      const verifiedResources = (metadata.resources || []).filter((resource) => {
+        // Only include resources with valid URLs from web search
+        if (!resource.url || !resource.url.startsWith("http")) {
+          return false;
+        }
+        
+        // Filter out AI-generated URLs (those with utm_source=openai or similar patterns)
+        if (resource.url.includes("utm_source=openai") || 
+            resource.url.includes("?utm_source=") ||
+            resource.url.includes("&utm_source=")) {
+          return false;
+        }
+        
+        // For YouTube, verify it's a real YouTube URL
+        if (resource.type === "youtube") {
+          const youtubeId = extractYouTubeId(resource.url);
+          return youtubeId !== null && youtubeId.length > 0;
+        }
+        
+        // For links, verify it's a valid URL
+        return resource.type === "link" && resource.url.length > 0;
       });
+      
+      if (verifiedResources.length > 0) {
+        // Find the "References and Sources" section or create it
+        let referencesIndex = -1;
+        for (let i = blocknoteContent.length - 1; i >= 0; i--) {
+          const block = blocknoteContent[i];
+          if (block.type === "heading" && 
+              block.content && 
+              Array.isArray(block.content) &&
+              block.content.length > 0 &&
+              typeof block.content[0] === "object" &&
+              "text" in block.content[0] &&
+              typeof block.content[0].text === "string" &&
+              block.content[0].text.toLowerCase().includes("references")) {
+            referencesIndex = i;
+            break;
+          }
+        }
+
+        // Add resources after references section or at the end
+        const insertIndex = referencesIndex >= 0 ? referencesIndex + 1 : blocknoteContent.length;
+
+        for (const resource of verifiedResources) {
+          if (resource.type === "youtube" && resource.url) {
+            // Add YouTube video block
+            blocknoteContent.splice(insertIndex, 0, {
+              id: crypto.randomUUID(),
+              type: "video",
+              props: {
+                url: resource.url,
+                name: resource.title || "",
+                caption: resource.description || "",
+                showPreview: true,
+                previewWidth: 512,
+                textAlignment: "left",
+                backgroundColor: "default",
+              },
+              content: undefined,
+              children: [],
+            } as Block);
+          } else if (resource.type === "link" && resource.url) {
+            // Add link as a paragraph with URL in text (can be converted to link in editor)
+            const linkText = resource.title ? `${resource.title}: ${resource.url}` : resource.url;
+            blocknoteContent.splice(insertIndex, 0, {
+              id: crypto.randomUUID(),
+              type: "paragraph",
+              props: {
+                textColor: "default",
+                backgroundColor: "default",
+                textAlignment: "left",
+              },
+              content: [{
+                type: "text",
+                text: linkText,
+                styles: {},
+              }],
+              children: [],
+            } as Block);
+          }
+        }
+      }
 
       // Generate embedding for the lesson plan
       let embedding: number[];
@@ -359,9 +1006,10 @@ export const generateLessonPlan = internalAction({
         
         // Update the lesson plan with generated content
         // Use internal mutation since we don't have auth context in scheduled actions
+        // Internal mutations are in mutations.ts and accessed via internal.functions.{module}.mutations.{name}
         await ctx.runMutation(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (internal as any).functions.lessonPlans.mutations.updateLessonPlan,
+          (internal as any).functions.lessonPlans.mutations.updateLessonPlanInternal,
           {
             lessonPlanId: args.lessonPlanId,
             content: blocknoteContent,
@@ -379,7 +1027,7 @@ export const generateLessonPlan = internalAction({
           try {
             await ctx.runMutation(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (internal as any).functions.lessonPlans.mutations.updateEmbedding,
+              (internal as any).functions.lessonPlans.mutations.updateEmbeddingInternal,
               {
                 lessonPlanId: args.lessonPlanId,
                 embedding,

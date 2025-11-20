@@ -6,7 +6,10 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { AppSidebar } from "./sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useSaveStatus } from "./saveStatusContext";
+import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
 const NO_SIDEBAR_PATHS = ["/signin", "/onboarding"];
 
@@ -43,10 +46,15 @@ function PageTitle() {
       return "Home";
     }
     
+    // Check for settings page
+    if (pathname === "/settings") {
+      return "Settings";
+    }
+    
     // Check for lesson plan
     if (lessonPlanId) {
       if (lessonPlan === undefined) {
-        return null; // Still loading
+        return "Lesson Plan"; // Still loading
       }
       if (lessonPlan === null) {
         return null; // Not found
@@ -57,7 +65,7 @@ function PageTitle() {
     // Check for lesson note
     if (lessonNoteId) {
       if (lessonNote === undefined) {
-        return null; // Still loading
+        return "Lesson Note"; // Still loading
       }
       if (lessonNote === null) {
         return null; // Not found
@@ -72,6 +80,48 @@ function PageTitle() {
   return <h1 className="text-lg font-semibold">{pageTitle || "Home"}</h1>;
 }
 
+function SaveStatusAlert() {
+  const { saveStatus } = useSaveStatus();
+  const pathname = usePathname();
+  
+  // Show on lesson plan and lesson note pages
+  const isLessonPlanPage = pathname?.startsWith("/lesson-plans/");
+  const isLessonNotePage = pathname?.startsWith("/lesson-notes/");
+  
+  if ((!isLessonPlanPage && !isLessonNotePage) || saveStatus === "idle") {
+    return null;
+  }
+  
+  if (saveStatus === "saving") {
+    return (
+      <Alert variant="default" className="ml-auto max-w-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <AlertDescription>Saving...</AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (saveStatus === "saved") {
+    return (
+      <Alert variant="default" className="ml-auto max-w-sm">
+        <CheckCircle2 className="h-4 w-4 text-green-600" />
+        <AlertDescription className="text-green-600">Saved</AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (saveStatus === "error") {
+    return (
+      <Alert variant="destructive" className="ml-auto max-w-sm">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>Failed to save</AlertDescription>
+      </Alert>
+    );
+  }
+  
+  return null;
+}
+
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldShowSidebar = !NO_SIDEBAR_PATHS.includes(pathname);
@@ -81,18 +131,17 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <section className="flex h-screen w-full">
-        <AppSidebar />
-        <SidebarInset className="flex flex-col h-screen overflow-hidden">
-          <header className="flex h-16 shrink-0 items-center gap-2 px-4">
-            <SidebarTrigger />
-            <PageTitle />
-          </header>
-          <main className="flex-1 overflow-auto p-4">{children}</main>
-        </SidebarInset>
-      </section>
-    </SidebarProvider>
+    <section className="flex h-screen w-full">
+      <AppSidebar />
+      <SidebarInset className="flex flex-col h-screen overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+          <SidebarTrigger />
+          <PageTitle />
+          <SaveStatusAlert />
+        </header>
+        <main className="flex-1 overflow-auto p-4">{children}</main>
+      </SidebarInset>
+    </section>
   );
 }
 

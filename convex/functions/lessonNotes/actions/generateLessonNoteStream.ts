@@ -142,9 +142,10 @@ export const generateLessonNoteStream = action({
       yield { type: "status", message: "Loading lesson plan..." };
 
       // Get lesson plan details
+      // Internal queries are in queries.ts and accessed via internal.functions.{module}.queries.{name}
       const lessonPlan = await ctx.runQuery(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { queries: { getLessonPlanForNoteGeneration: unknown } } } }).functions.lessonNotes.queries.getLessonPlanForNoteGeneration,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (internal as any).functions.lessonNotes.queries.getLessonPlanForNoteGeneration,
         {
           lessonPlanId: args.lessonPlanId,
         }
@@ -169,8 +170,8 @@ export const generateLessonNoteStream = action({
 
       // Get class and subject details
       const { class: classDoc, subject: subjectDoc } = await ctx.runQuery(
-        // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { queries: { getClassAndSubjectDetailsForNote: unknown } } } }).functions.lessonNotes.queries.getClassAndSubjectDetailsForNote,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (internal as any).functions.lessonNotes.queries.getClassAndSubjectDetailsForNote,
         {
           lessonPlanId: args.lessonPlanId,
         }
@@ -478,7 +479,7 @@ export const generateLessonNoteStream = action({
       // Store lesson note
       const lessonNoteId = await ctx.runMutation(
         // @ts-expect-error - internal API path structure not fully typed by Convex
-        (internal as unknown as { functions: { lessonNotes: { mutations: { createLessonNote: unknown } } } }).functions.lessonNotes.mutations.createLessonNote,
+        (internal as unknown as { functions: { lessonNotes: { mutations: { createLessonNoteInternal: unknown } } } }).functions.lessonNotes.mutations.createLessonNoteInternal,
         {
           userId: authUserId,
           lessonPlanId: args.lessonPlanId,

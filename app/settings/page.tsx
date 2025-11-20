@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, startTransition } from "react";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,8 +30,13 @@ import {
   ComboboxEmpty,
   ComboboxIcon,
 } from "@/components/ui/base-combobox";
+import { toast } from "sonner";
 
-const onboardingSchema = z.object({
+const settingsSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
   schoolName: z
     .string()
     .min(1, "School name is required")
@@ -43,7 +47,7 @@ const onboardingSchema = z.object({
     .min(2, "Country name must be at least 2 characters"),
 });
 
-type OnboardingFormValues = z.infer<typeof onboardingSchema>;
+type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 // List of all countries
 const COUNTRIES = [
@@ -69,7 +73,7 @@ const COUNTRIES = [
   "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
 ];
 
-export default function Onboarding() {
+export default function SettingsPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [countryInputValue, setCountryInputValue] = useState("");
@@ -87,25 +91,21 @@ export default function Onboarding() {
     api.functions.userProfile.mutations.createOrUpdateUserProfile
   );
 
-  const form = useForm<OnboardingFormValues>({
-    resolver: zodResolver(onboardingSchema),
+  const form = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsSchema),
     defaultValues: {
+      name: "",
       schoolName: "",
       country: "",
     },
   });
 
-  // Pre-fill form if profile exists
+  // Pre-fill form with existing profile data
   useEffect(() => {
     if (userProfile) {
-      if (userProfile.onboardingCompleted) {
-        // Already completed onboarding, redirect to home
-        // The home page will handle showing the sign-in toast if needed
-        router.push("/");
-        return;
+      if (userProfile.name) {
+        form.setValue("name", userProfile.name);
       }
-      
-      // Pre-fill form with existing data
       if (userProfile.schoolName) {
         form.setValue("schoolName", userProfile.schoolName);
       }
@@ -117,22 +117,19 @@ export default function Onboarding() {
         });
       }
     }
-  }, [userProfile, form, router]);
+  }, [userProfile, form]);
 
-  const onSubmit = async (data: OnboardingFormValues) => {
+  const onSubmit = async (data: SettingsFormValues) => {
     setError(null);
     
     try {
-      // Get user data from profile
-      // If profile doesn't exist, we need name and email from Google OAuth
-      // For now, if profile exists, use its data; otherwise, we'll need to handle this
       if (!userProfile) {
         setError("User profile not found. Please sign in again.");
         return;
       }
 
       await createOrUpdateProfile({
-        name: userProfile.name,
+        name: data.name,
         email: userProfile.email,
         profilePhoto: userProfile.profilePhoto,
         googleId: userProfile.googleId,
@@ -140,69 +137,71 @@ export default function Onboarding() {
         country: data.country,
       });
 
-      // Redirect to home page after successful onboarding
-      router.push("/");
+      toast.success("Profile updated successfully");
+      // Optionally redirect to home or stay on settings page
+      // router.push("/");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to complete onboarding. Please try again."
-      );
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Failed to update profile. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
   // Show loading state while checking profile
   if (userProfile === undefined) {
     return (
-      <main className="min-h-screen w-full bg-white relative flex items-center justify-center">
+      <main className="flex flex-col h-full w-full items-center justify-center p-6">
         <Spinner className="size-8" />
       </main>
     );
   }
 
-  return (
-    <main className="min-h-screen w-full bg-white relative">
-      {/* Teal Glow Background */}
-      <section
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `
-            radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #14b8a6 100%)
-          `,
-          backgroundSize: "100% 100%",
-        }}
-        aria-hidden="true"
-      />
+  // Redirect to onboarding if profile doesn't exist or onboarding not completed
+  if (userProfile === null || !userProfile.onboardingCompleted) {
+    router.push("/onboarding");
+    return null;
+  }
 
-      {/* Content */}
-      <section className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
-        <header className="text-center flex flex-col items-center gap-3 mb-12">
-          <Image
-            src="/nali-logo.svg"
-            alt="Nali Logo"
-            width={115}
-            height={33}
-            priority
-          />
-          <h1 className="text-4xl font-bold text-slate-900">
-            Complete Your Profile
-          </h1>
-          <p className="text-lg font-medium text-slate-700 max-w-md">
-            Tell us about your school to get started with Nali
+  return (
+    <main className="flex flex-col h-full w-full p-6">
+      <section className="max-w-[350px] mx-auto w-full space-y-6">
+        <header className="space-y-2">
+          <p className="text-muted-foreground">
+            Update your profile information
           </p>
         </header>
 
-        <article className="w-full max-w-md">
+        <article>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormDescription>
+                      Your full name
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter your name"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="schoolName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      School Name
-                    </FormLabel>
+                    <FormLabel>School Name</FormLabel>
                     <FormDescription>
                       The name of the school where you teach
                     </FormDescription>
@@ -222,9 +221,7 @@ export default function Onboarding() {
                 name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Country
-                    </FormLabel>
+                    <FormLabel>Country</FormLabel>
                     <FormDescription>
                       The country where your school is located
                     </FormDescription>
@@ -268,32 +265,39 @@ export default function Onboarding() {
 
               {error && (
                 <section
-                  className="bg-rose-50 border border-rose-200 rounded-lg p-4"
+                  className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"
                   role="alert"
                   aria-live="polite"
                 >
-                  <p className="text-rose-800 font-medium text-sm">
+                  <p className="text-destructive font-medium text-sm">
                     <strong>Error:</strong> {error}
                   </p>
                 </section>
               )}
 
-              <Button
-                type="submit"
-                variant="default-glass"
-                size="lg"
-                disabled={form.formState.isSubmitting}
-                className="w-full rounded-full"
-              >
-                {form.formState.isSubmitting ? (
-                  <>
-                    <Spinner className="size-4" />
-                    Saving...
-                  </>
-                ) : (
-                  "Complete Setup"
-                )}
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                  disabled={form.formState.isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting ? (
+                    <>
+                      <Spinner className="size-4 mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
             </form>
           </Form>
         </article>

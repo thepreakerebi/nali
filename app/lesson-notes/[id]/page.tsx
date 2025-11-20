@@ -12,43 +12,43 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSaveStatus } from "@/app/_components/saveStatusContext";
 
-export default function LessonPlanEditorPage() {
+export default function LessonNoteEditorPage() {
   const params = useParams();
   const router = useRouter();
-  const lessonPlanId = params.id as Id<"lessonPlans">;
+  const lessonNoteId = params.id as Id<"lessonNotes">;
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const isInitialLoadRef = useRef(true);
   const isSavingRef = useRef(false);
   const { setSaveStatus } = useSaveStatus();
 
-  // Fetch lesson plan
-  const lessonPlan = useQuery(
-    api.functions.lessonPlans.queries.getLessonPlan,
-    lessonPlanId ? { lessonPlanId } : "skip"
+  // Fetch lesson note
+  const lessonNote = useQuery(
+    api.functions.lessonNotes.queries.getLessonNote,
+    lessonNoteId ? { lessonNoteId } : "skip"
   );
-  const updateLessonPlan = useMutation(api.functions.lessonPlans.mutations.updateLessonPlan);
+  const updateLessonNote = useMutation(api.functions.lessonNotes.mutations.updateLessonNote);
 
   // Track when content is loaded from server
   useEffect(() => {
-    if (lessonPlan && lessonPlan.content) {
+    if (lessonNote && lessonNote.content) {
       // Mark initial load as complete after a short delay to allow editor to initialize
       const timer = setTimeout(() => {
         isInitialLoadRef.current = false;
         // Store the initial content hash to compare against
-        lastSavedContentRef.current = JSON.stringify(lessonPlan.content);
+        lastSavedContentRef.current = JSON.stringify(lessonNote.content);
       }, 500);
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lessonPlan?.content]);
+  }, [lessonNote?.content]);
 
-  // Check if lesson plan is being generated (content is empty/default)
+  // Check if lesson note is being generated (content is empty/default)
   const isGenerating = useMemo(() => {
-    if (!lessonPlan || lessonPlan === null) return false;
+    if (!lessonNote || lessonNote === null) return false;
     
     // Check if content is empty or just the default empty paragraph
-    const content = lessonPlan.content;
+    const content = lessonNote.content;
     if (!content || !Array.isArray(content)) return false;
     
     // If content has only one empty paragraph, it's likely still generating
@@ -73,7 +73,7 @@ export default function LessonPlanEditorPage() {
     
     // If content has more than one block or non-empty content, generation is complete
     return false;
-  }, [lessonPlan]);
+  }, [lessonNote]);
 
   // Handle content changes with debouncing
   const handleContentChange = (blocks: unknown) => {
@@ -111,8 +111,8 @@ export default function LessonPlanEditorPage() {
       isSavingRef.current = true;
       setSaveStatus("saving");
       try {
-        await updateLessonPlan({
-          lessonPlanId,
+        await updateLessonNote({
+          lessonNoteId,
           content: blocks,
         });
         
@@ -125,7 +125,7 @@ export default function LessonPlanEditorPage() {
           setSaveStatus("idle");
         }, 2000);
       } catch (error) {
-        console.error("Error saving lesson plan:", error);
+        console.error("Error saving lesson note:", error);
         toast.error("Failed to save changes. Please try again.");
         setSaveStatus("error");
         
@@ -157,7 +157,7 @@ export default function LessonPlanEditorPage() {
   }, []);
 
   // Loading state
-  if (lessonPlan === undefined) {
+  if (lessonNote === undefined) {
     return (
       <main className="flex flex-col h-full w-full p-6 gap-4">
         <Skeleton className="h-10 w-48" />
@@ -167,12 +167,12 @@ export default function LessonPlanEditorPage() {
   }
 
   // Not found state
-  if (lessonPlan === null) {
+  if (lessonNote === null) {
     return (
       <main className="flex flex-col h-full w-full p-4 gap-4 items-center justify-center">
-        <h1 className="text-2xl font-bold">Lesson Plan Not Found</h1>
+        <h1 className="text-2xl font-bold">Lesson Note Not Found</h1>
         <p className="text-muted-foreground">
-          The lesson plan you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+          The lesson note you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
         </p>
         <Button
           variant="outline"
@@ -194,7 +194,7 @@ export default function LessonPlanEditorPage() {
         )}
       >
         <BlockNoteEditor
-          initialContent={lessonPlan.content}
+          initialContent={lessonNote.content}
           onContentChange={handleContentChange}
         />
       </section>

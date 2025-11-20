@@ -118,7 +118,7 @@ export const updateLessonNoteEmbedding = internalAction({
       try {
         await ctx.runMutation(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (internal as any).functions.lessonNotes.mutations.updateEmbedding,
+          (internal as any).functions.lessonNotes.mutations.updateEmbeddingInternal,
           {
             lessonNoteId: args.lessonNoteId,
             embedding,

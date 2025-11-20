@@ -72,7 +72,7 @@ export default defineSchema({
     .index("by_user_id_and_subject_id", ["userId", "subjectId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
-      dimensions: 1024, // Mistral embeddings dimension
+      dimensions: 1536, // OpenAI text-embedding-3-small dimension
       filterFields: ["classId", "subjectId", "userId"],
     }),
 
@@ -87,7 +87,7 @@ export default defineSchema({
     .index("by_user_id", ["userId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
-      dimensions: 1024, // Mistral embeddings dimension
+      dimensions: 1536, // OpenAI text-embedding-3-small dimension
       filterFields: ["lessonPlanId", "userId"],
     }),
 });

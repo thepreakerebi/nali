@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { GraduationCap, BookOpen, FileText, StickyNote, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +21,7 @@ import { AddSubjectModal } from "@/app/_components/addSubjectModal";
 import { EditSubjectModal } from "@/app/_components/editSubjectModal";
 import { DeleteSubjectModal } from "@/app/_components/deleteSubjectModal";
 import { CreateLessonPlanModal } from "@/app/_components/createLessonPlanModal";
+import { CreateLessonNoteModal } from "@/app/_components/createLessonNoteModal";
 
 interface StatCardProps {
   title: string;
@@ -94,6 +96,7 @@ export default function Home() {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<"classes" | "subjects">("classes");
   const [isCreateLessonPlanModalOpen, setIsCreateLessonPlanModalOpen] = useState(false);
+  const [isCreateLessonNoteModalOpen, setIsCreateLessonNoteModalOpen] = useState(false);
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
   
   // Fetch counts
@@ -105,6 +108,17 @@ export default function Home() {
   // Fetch lists
   const classes = useQuery(api.functions.classes.queries.listClasses, {});
   const subjects = useQuery(api.functions.subjects.queries.listSubjects, {});
+
+  // Show sign-in toast if user just signed in
+  useEffect(() => {
+    const justSignedIn = sessionStorage.getItem("justSignedIn");
+    if (justSignedIn === "true" && userProfile !== null && userProfile !== undefined) {
+      // Clear the flag
+      sessionStorage.removeItem("justSignedIn");
+      // Show toast on home page
+      toast.success("You're signed in");
+    }
+  }, [userProfile]);
 
   // Redirect immediately without rendering anything if onboarding not completed
   useEffect(() => {
@@ -135,7 +149,7 @@ export default function Home() {
   };
 
   const handleCreateLessonNote = () => {
-    router.push("/lesson-notes/new");
+    setIsCreateLessonNoteModalOpen(true);
   };
 
   const handleEditClass = (id: Id<"classes">) => {
@@ -271,6 +285,10 @@ export default function Home() {
         open={isCreateLessonPlanModalOpen}
         onOpenChange={setIsCreateLessonPlanModalOpen}
       />
+      <CreateLessonNoteModal
+        open={isCreateLessonNoteModalOpen}
+        onOpenChange={setIsCreateLessonNoteModalOpen}
+      />
       <section className="flex flex-col w-full gap-4">
         {/* Stats Cards Section */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -303,7 +321,7 @@ export default function Home() {
         {/* Second Section - Classes and Subjects Tabs */}
         <section className="flex flex-col w-full gap-4">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "classes" | "subjects")} className="w-full">
-            <TabsList className="sticky top-0 z-10 bg-background border-b -mx-4">
+            <TabsList className="sticky w-full top-0 z-10 bg-background border-b -mx-4">
               <TabsTrigger value="classes">Classes</TabsTrigger>
               <TabsTrigger value="subjects">Subjects</TabsTrigger>
             </TabsList>

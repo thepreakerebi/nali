@@ -17,7 +17,6 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const intl = useIntl();
-  const hasShownToast = useRef(false);
   
   // Check user profile after sign-in to determine redirect
   const userProfile = useQuery(api.functions.userProfile.queries.getCurrentUserProfile);
@@ -27,6 +26,8 @@ export default function SignIn() {
     setError(null);
     try {
       await signIn("google");
+      // Store flag in sessionStorage to show toast on home page
+      sessionStorage.setItem("justSignedIn", "true");
       // Wait a bit for profile to be available, then redirect
       // The redirect will be handled by useEffect below
     } catch (err) {
@@ -44,12 +45,6 @@ export default function SignIn() {
   // This prevents the flash of home page
   useEffect(() => {
     if (userProfile !== undefined && !loading) {
-      // Show success toast once when user successfully signs in
-      if (userProfile !== null && !hasShownToast.current) {
-        hasShownToast.current = true;
-        toast.success("You're signed in");
-      }
-      
       // Always redirect to onboarding first
       // The onboarding page will check if onboarding is completed and redirect to home if needed
       router.replace("/onboarding");
