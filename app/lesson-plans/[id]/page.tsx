@@ -169,7 +169,7 @@ export default function LessonPlanEditorPage() {
   // Not found state
   if (lessonPlan === null) {
     return (
-      <main className="flex flex-col h-full w-full p-6 gap-4 items-center justify-center">
+      <main className="flex flex-col h-full w-full p-4 gap-4 items-center justify-center">
         <h1 className="text-2xl font-bold">Lesson Plan Not Found</h1>
         <p className="text-muted-foreground">
           The lesson plan you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
@@ -189,7 +189,7 @@ export default function LessonPlanEditorPage() {
       {/* Editor */}
       <section
         className={cn(
-          "flex-1 overflow-auto px-6 md:px-32 py-6 bg-background transition-all duration-300",
+          "flex-1 overflow-auto px-0 md:px-6 lg:px-32 py-6 bg-background transition-all duration-300",
           isGenerating && "generating-glow"
         )}
       >

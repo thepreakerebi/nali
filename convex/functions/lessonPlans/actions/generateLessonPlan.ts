@@ -23,6 +23,8 @@ import { formatError } from "../../utils/errors";
 import { marked } from "marked";
 import type { Tokens } from "marked";
 import type { Block } from "@blocknote/core";
+import { createSearchCurriculumResourcesTool } from "../tools/searchCurriculumResources";
+import { createExtractResourceContentTool } from "../tools/extractResourceContent";
 
 // Schema for structured lesson plan metadata extraction
 const lessonPlanMetadataSchema = z.object({
@@ -104,15 +106,14 @@ export const generateLessonPlan = internalAction({
       const country = args.country || userProfile?.country || undefined;
       const language = args.language || userProfile?.preferredLanguage || "en";
 
-      // Create agent with OpenAI's built-in web search tool
-      // The agent will automatically search for curriculum resources as needed
+      // Create agent with Firecrawl tools for curriculum resource search and extraction
+      // The agent will search for curriculum resources and extract detailed content as needed
       const agent = new Agent({
         model: openai("gpt-4o"),
         system: LESSON_PLAN_GENERATION_SYSTEM_PROMPT,
         tools: {
-          web_search: openai.tools.webSearch({
-            searchContextSize: "high", // Get comprehensive search results
-          }),
+          searchCurriculumResources: createSearchCurriculumResourcesTool(),
+          extractResourceContent: createExtractResourceContentTool(),
         },
         stopWhen: stepCountIs(15),
       });
@@ -138,8 +139,8 @@ export const generateLessonPlan = internalAction({
         throw new Error("Failed to generate lesson plan content");
       }
 
-      // Extract resources from web search results if available
-      // Check for sources in result.sources (if available) or extract from tool results in steps
+      // Extract resources from Firecrawl tool results
+      // Check tool results in agent steps for searchCurriculumResources and extractResourceContent
       let extractedResources: Array<{
         type: "youtube" | "document" | "link";
         title: string;
@@ -147,71 +148,144 @@ export const generateLessonPlan = internalAction({
         description: string;
       }> = [];
 
-      // Try to get sources from result.sources (available when using generateText with web_search)
-      if ("sources" in result && Array.isArray(result.sources)) {
-        extractedResources = result.sources
-          .filter((source) => {
-            if (source.sourceType !== "url" || !("url" in source)) {
-              return false;
-            }
-            const url = (source as { url: string }).url;
-            // Filter out URLs with utm_source parameters (AI-generated tracking)
-            return !url.includes("utm_source=");
-          })
-          .map((source) => {
-            const url = (source as { url: string; title?: string }).url;
-            const title = (source as { url: string; title?: string }).title;
-            // Remove any utm parameters from URL
-            const cleanUrl = url.split("?")[0] + (url.includes("?") ? "?" + url.split("?")[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") : "");
-            return {
-              type: cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
-                ? "youtube" as const 
-                : "link" as const,
-              title: title || "Untitled",
-              url: cleanUrl,
-              description: "",
-            };
-          });
-      } else {
-        // Extract URLs from tool results in steps (fallback for Agent)
-        // Agent steps may contain web_search tool results with sources
-        const toolResults = result.steps.flatMap((step) => {
-          const stepAny = step as { toolResults?: Array<{ toolName?: string; result?: { sources?: Array<{ url?: string; title?: string }> } }> };
-          return stepAny.toolResults?.filter((tr) => tr.toolName === "web_search") || [];
-        });
+      // Extract resources from Firecrawl tool results in agent steps
+      const toolResults = result.steps.flatMap((step) => {
+        const stepAny = step as { 
+          toolResults?: Array<{ 
+            toolName?: string; 
+            result?: unknown;
+          }> 
+        };
+        return stepAny.toolResults || [];
+      });
+
+      // Process searchCurriculumResources tool results
+      const searchResults = toolResults.filter((tr) => tr.toolName === "searchCurriculumResources");
+      for (const searchResult of searchResults) {
+        // Check if result exists before accessing properties (following Shamp pattern)
+        if (!searchResult.result) {
+          continue;
+        }
         
-        for (const toolResult of toolResults) {
-          const resultAny = toolResult as { result?: { sources?: Array<{ url?: string; title?: string }> } };
-          if (resultAny.result?.sources && Array.isArray(resultAny.result.sources)) {
-            extractedResources = resultAny.result.sources
-              .filter((source): source is { url: string; title?: string } => {
-                if (!source.url) return false;
-                // Filter out URLs with utm_source parameters (AI-generated tracking)
-                return !source.url.includes("utm_source=");
-              })
-              .map((source) => {
-                // Remove any utm parameters from URL
-                const urlParts = source.url.split("?");
-                const baseUrl = urlParts[0];
-                const params = urlParts[1] ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") : "";
-                const cleanUrl = baseUrl + (params ? "?" + params : "");
-                
-                return {
-                  type: cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
-                    ? "youtube" as const 
-                    : "link" as const,
-                  title: source.title || "Untitled",
-                  url: cleanUrl,
-                  description: "",
-                };
-              });
-            break; // Use first web_search result
-          }
+        const resultAny = searchResult.result as { 
+          resources?: Array<{
+            url: string;
+            title: string;
+            description?: string;
+            type?: "youtube" | "document" | "link";
+          }>;
+        };
+        
+        if (resultAny?.resources && Array.isArray(resultAny.resources)) {
+          const resources = resultAny.resources
+            .filter((resource) => {
+              if (!resource.url) return false;
+              // Filter out URLs with utm_source parameters (AI-generated tracking)
+              return !resource.url.includes("utm_source=");
+            })
+            .map((resource) => {
+              // Remove any utm parameters from URL
+              const urlParts = resource.url.split("?");
+              const baseUrl = urlParts[0];
+              const params = urlParts[1] 
+                ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") 
+                : "";
+              const cleanUrl = baseUrl + (params ? "?" + params : "");
+              
+              return {
+                type: (resource.type || 
+                  (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
+                    ? "youtube" 
+                    : "link")) as "youtube" | "document" | "link",
+                title: resource.title || "Untitled",
+                url: cleanUrl,
+                description: resource.description || "",
+              };
+            });
+          
+          extractedResources.push(...resources);
         }
       }
 
+      // Process extractResourceContent tool results (these have more detailed information)
+      const extractResults = toolResults.filter((tr) => tr.toolName === "extractResourceContent");
+      for (const extractResult of extractResults) {
+        // Check if result exists before accessing properties (following Shamp pattern)
+        if (!extractResult.result) {
+          continue;
+        }
+        
+        const resultAny = extractResult.result as {
+          resources?: Array<{
+            url: string;
+            title: string;
+            summary?: string;
+            type?: "youtube" | "document" | "link";
+            educationalValue?: string;
+          }>;
+        };
+        
+        if (resultAny?.resources && Array.isArray(resultAny.resources)) {
+          resultAny.resources
+            .filter((resource) => {
+              if (!resource.url) return false;
+              // Filter out URLs with utm_source parameters
+              return !resource.url.includes("utm_source=");
+            })
+            .forEach((resource) => {
+              // Remove any utm parameters from URL
+              const urlParts = resource.url.split("?");
+              const baseUrl = urlParts[0];
+              const params = urlParts[1] 
+                ? urlParts[1].split("&").filter((param) => !param.startsWith("utm_")).join("&") 
+                : "";
+              const cleanUrl = baseUrl + (params ? "?" + params : "");
+              
+              // Use extract results (more detailed) but don't duplicate if already in extractedResources
+              const existingIndex = extractedResources.findIndex((r) => r.url === cleanUrl);
+              if (existingIndex >= 0) {
+                // Update existing resource with more detailed info from extraction
+                extractedResources[existingIndex] = {
+                  ...extractedResources[existingIndex],
+                  description: resource.summary || resource.educationalValue || extractedResources[existingIndex].description,
+                };
+              } else {
+                // Add new resource
+                extractedResources.push({
+                  type: (resource.type || 
+                    (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be") 
+                      ? "youtube" 
+                      : "link")) as "youtube" | "document" | "link",
+                  title: resource.title || "Untitled",
+                  url: cleanUrl,
+                  description: resource.summary || resource.educationalValue || "",
+                });
+              }
+            });
+        }
+      }
+
+      // Remove duplicates based on URL
+      const uniqueResources = extractedResources.filter((resource, index, self) =>
+        index === self.findIndex((r) => r.url === resource.url)
+      );
+      extractedResources = uniqueResources;
+
       // Extract structured metadata from generated content
-      let metadata;
+      let metadata: {
+        objectives: string[];
+        materials: string[];
+        methods: string[];
+        assessment: string[];
+        references: string[];
+        resources: Array<{
+          type: "youtube" | "document" | "link";
+          title: string;
+          url: string;
+          description?: string;
+        }>;
+      };
+      
       try {
         const extractionResult = await generateObject({
           model: openai("gpt-4o"),
@@ -221,21 +295,36 @@ export const generateLessonPlan = internalAction({
 
         metadata = extractionResult.object;
         
-        // Merge web search sources into resources if not already included
+        // Ensure resources array exists
+        if (!metadata.resources) {
+          metadata.resources = [];
+        }
+        
+        // Merge Firecrawl tool sources into resources if not already included
         if (extractedResources.length > 0 && metadata.resources.length === 0) {
           metadata.resources = extractedResources;
+        } else if (extractedResources.length > 0 && metadata.resources.length > 0) {
+          // Merge extracted resources with metadata resources, avoiding duplicates
+          const existingUrls = new Set(metadata.resources.map((r: { url: string }) => r.url));
+          const newResources = extractedResources.filter((r) => !existingUrls.has(r.url));
+          metadata.resources = [...metadata.resources, ...newResources];
         }
       } catch (error) {
         console.error("Error extracting metadata:", error);
-        // Use fallback metadata with web search sources
+        // Use fallback metadata with Firecrawl tool sources
         metadata = {
           objectives: args.objectives || [],
           materials: [],
           methods: [],
           assessment: [],
           references: [],
-          resources: extractedResources,
+          resources: extractedResources || [],
         };
+      }
+      
+      // Final safety check: ensure resources array always exists
+      if (!metadata.resources || !Array.isArray(metadata.resources)) {
+        metadata.resources = extractedResources || [];
       }
 
       // Helper function to extract YouTube video ID from URL
@@ -255,6 +344,7 @@ export const generateLessonPlan = internalAction({
 
       // Helper function to convert markdown tokens to inline content
       const tokensToInlineContent = (tokens: Tokens.Generic[]): Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> => {
+        // Return type allows both 'text' and 'content' properties for flexibility
         const result: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
         
         for (const token of tokens) {
@@ -308,13 +398,23 @@ export const generateLessonPlan = internalAction({
               // Regular link - BlockNote format: { type: "link", content: "text", href: "url" }
               const children = tokensToInlineContent(linkToken.tokens || []);
               const linkText = children.length > 0 
-                ? children.map(c => c.text || "").join("") 
+                ? children.map(c => (c.type === "text" ? c.text : c.content || "")).join("") 
                 : href;
+              
+              // Clean URL to remove utm parameters
+              let cleanHref = href;
+              if (cleanHref.includes("?")) {
+                const [baseUrl, params] = cleanHref.split("?");
+                if (params) {
+                  const cleanParams = params.split("&").filter((param) => !param.startsWith("utm_")).join("&");
+                  cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
+                }
+              }
               
               result.push({
                 type: "link",
-                content: linkText,
-                href: href,
+                content: linkText || cleanHref,
+                href: cleanHref,
               } as { type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> });
             }
           } else if (token.type === "code") {
@@ -525,7 +625,7 @@ export const generateLessonPlan = internalAction({
             }
           }
           
-          // Clean URLs in inline content to remove utm_source parameters
+          // Clean URLs in inline content to remove utm_source parameters and ensure correct format
           inlineContent = inlineContent.map(item => {
             if (item.type === "link" && item.href) {
               let cleanHref = item.href;
@@ -536,7 +636,16 @@ export const generateLessonPlan = internalAction({
                   cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
                 }
               }
-              return { ...item, href: cleanHref };
+              // Ensure BlockNote link format: { type: "link", content: "text", href: "url" }
+              return { 
+                type: "link", 
+                content: item.content || item.text || cleanHref, 
+                href: cleanHref 
+              };
+            }
+            // Ensure text items have correct format
+            if (item.type === "text") {
+              return { type: "text", text: item.text || item.content || "", styles: item.styles || {} };
             }
             return item;
           });
@@ -580,7 +689,7 @@ export const generateLessonPlan = internalAction({
           
           for (const item of listToken.items) {
             const itemToken = item as Tokens.ListItem;
-            let inlineContent: Array<{ type: string; text?: string; href?: string; styles?: Record<string, boolean> }> = [];
+            let inlineContent: Array<{ type: string; text?: string; href?: string; content?: string; styles?: Record<string, boolean> }> = [];
             
             // If tokens exist, use them; otherwise parse the text
             if (itemToken.tokens && itemToken.tokens.length > 0) {
@@ -606,7 +715,7 @@ export const generateLessonPlan = internalAction({
               continue; // Skip empty or placeholder list items
             }
             
-            // Clean URLs in inline content to remove utm_source parameters
+            // Clean URLs in inline content to remove utm_source parameters and ensure correct format
             const cleanedInlineContent = inlineContent.map(item => {
               if (item.type === "link" && item.href) {
                 let cleanHref = item.href;
@@ -617,7 +726,16 @@ export const generateLessonPlan = internalAction({
                     cleanHref = baseUrl + (cleanParams ? "?" + cleanParams : "");
                   }
                 }
-                return { ...item, href: cleanHref };
+                // Ensure BlockNote link format: { type: "link", content: "text", href: "url" }
+                return { 
+                  type: "link", 
+                  content: item.content || item.text || cleanHref, 
+                  href: cleanHref 
+                };
+              }
+              // Ensure text items have correct format
+              if (item.type === "text") {
+                return { type: "text", text: item.text || item.content || "", styles: item.styles || {} };
               }
               return item;
             });

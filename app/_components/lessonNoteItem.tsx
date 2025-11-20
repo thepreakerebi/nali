@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
 import { TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,15 +18,26 @@ interface LessonNoteItemProps {
 
 export function LessonNoteItem({ note, isActive = false, onDelete }: LessonNoteItemProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
+
+  const handleItemClick = () => {
+    router.push(`/lesson-notes/${note._id}`);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(note._id);
+  };
 
   return (
     <article
       className={cn(
-        "group relative flex items-center gap-2 rounded-md px-2 py-2 transition-colors",
+        "group relative flex items-center gap-2 rounded-md px-2 py-2 transition-colors cursor-pointer",
         isActive
           ? "bg-sidebar-accent font-bold text-sidebar-accent-foreground"
           : "hover:bg-sidebar-accent text-sidebar-foreground"
       )}
+      onClick={handleItemClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -37,7 +49,7 @@ export function LessonNoteItem({ note, isActive = false, onDelete }: LessonNoteI
           variant="ghost"
           size="icon"
           className="h-6 w-6 text-destructive hover:text-destructive"
-          onClick={() => onDelete(note._id)}
+          onClick={handleDeleteClick}
           aria-label="Delete lesson note"
         >
           <TrashIcon className="h-3.5 w-3.5" />
