@@ -6,6 +6,7 @@ import {
 
 const isSignInPage = createRouteMatcher(["/signin"]);
 const isProtectedRoute = createRouteMatcher(["/", "/onboarding", "/lesson-plans/:path*", "/lesson-notes/:path*", "/settings"]);
+const isApiRoute = createRouteMatcher(["/api/:path*"]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   const isAuthenticated = await convexAuth.isAuthenticated();
@@ -15,6 +16,14 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   // This prevents users from seeing the home page flash before onboarding
   if (isSignInPage(request) && isAuthenticated) {
     return nextjsMiddlewareRedirect(request, "/onboarding");
+  }
+  
+  // Protect API routes - return 401 for unauthenticated requests
+  if (isApiRoute(request) && !isAuthenticated) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
   }
   
   // Protect routes that require authentication

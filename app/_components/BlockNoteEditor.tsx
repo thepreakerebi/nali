@@ -20,9 +20,6 @@ import {
 } from "@blocknote/xl-ai";
 import { en } from "@blocknote/core/locales";
 import { en as aiEn } from "@blocknote/xl-ai/locales";
-import type { ChatTransport, UIMessage, UIMessageChunk, ChatRequestOptions } from "ai";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import "@blocknote/xl-ai/style.css";
 
 interface BlockNoteEditorProps {
@@ -127,119 +124,24 @@ function SuggestionMenuWithAI({ editor }: { editor: BlockNoteEditorType }) {
   );
 }
 
-/**
- * Custom transport that calls Convex action instead of HTTP endpoint
- * Converts async generator from Convex action to ReadableStream for BlockNote AI
- */
-class ConvexChatTransport implements ChatTransport<UIMessage> {
-  constructor(private callAction: (args: { messages: UIMessage[]; toolDefinitions: any }) => Promise<AsyncIterable<string>>) {}
-
-  async sendMessages({
-    messages,
-    body,
-    abortSignal,
-  }: {
-    trigger: "submit-message" | "regenerate-message";
-    chatId: string;
-    messageId: string | undefined;
-    messages: UIMessage[];
-    abortSignal: AbortSignal | undefined;
-  } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
-    const bodyAny = body as { toolDefinitions?: any } | undefined;
-    const toolDefinitions = bodyAny?.toolDefinitions || {};
-    const asyncIterable = await this.callAction({ messages, toolDefinitions });
-    
-    // Convert async generator to ReadableStream
-    // Parse JSON strings back to UIMessageChunk objects
-    return new ReadableStream<UIMessageChunk>({
-      async start(controller) {
-        try {
-          for await (const chunkJson of asyncIterable) {
-            // Check if request was aborted
-            if (abortSignal?.aborted) {
-              controller.close();
-              return;
-            }
-            // Parse JSON string back to UIMessageChunk
-            const chunk = JSON.parse(chunkJson) as UIMessageChunk;
-            controller.enqueue(chunk);
-          }
-          controller.close();
-        } catch (error) {
-          if (!abortSignal?.aborted) {
-            controller.error(error);
-          }
-        }
-      },
-    });
-  }
-
-  async reconnectToStream({
-    chatId,
-  }: {
-    chatId: string;
-  } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
-    // Reconnection not supported for Convex transport
-    throw new Error("Reconnection not supported for Convex transport");
-  }
-}
-
 export function BlockNoteEditor({ initialContent, onContentChange }: BlockNoteEditorProps) {
   const [editor, setEditor] = useState<BlockNoteEditorType | null>(null);
   const hasLoadedContentRef = useRef(false);
   const isProcessingRef = useRef(false);
   const processedBlocksRef = useRef<Set<string>>(new Set());
 
-  // Get Convex action hook
-  const blocknoteAIAction = useAction(api.functions.lessonPlans.actions.blocknoteAI.blocknoteAI);
-
-  // Create custom transport that calls Convex action
-  const convexTransport = useRef<ConvexChatTransport | null>(null);
-  if (!convexTransport.current) {
-    convexTransport.current = new ConvexChatTransport(async ({ messages, toolDefinitions }) => {
-      // Convert UIMessage to simple message format for Convex action
-      const simpleMessages = messages
-        .map((msg) => {
-          // Extract text content from UIMessage parts
-          const textParts = msg.parts
-            .filter((part) => part.type === "text")
-            .map((part) => (part as { text: string }).text)
-            .join("");
-          
-          return {
-            role: msg.role as "user" | "assistant" | "system",
-            content: textParts || "",
-          };
-        })
-        // Filter out messages with empty content (except system messages which might be empty)
-        .filter((msg) => {
-          // Keep system messages even if empty (they might be used for context)
-          // Filter out user/assistant messages with no content
-          if (msg.role === "system") return true;
-          return msg.content.trim().length > 0;
-        });
-
-      // Call Convex action which returns a Promise that resolves to an async generator
-      const actionResult = await blocknoteAIAction({
-        messages: simpleMessages,
-        toolDefinitions,
-      });
-      
-      // The action returns an async generator of JSON strings (Convex handles streaming actions specially)
-      return actionResult as AsyncIterable<string>;
-    });
-  }
-
   // Initialize BlockNote editor with AI extension
+  // Using default HTTP transport which will call /api/chat
   const editorInstance = useCreateBlockNote({
     dictionary: {
       ...en,
       ai: aiEn, // add default translations for the AI extension
     },
-    // Register the AI extension with custom Convex transport
+    // Register the AI extension with default HTTP transport
     extensions: [
       createAIExtension({
-        transport: convexTransport.current,
+        // No transport specified - uses default HTTP transport
+        // Will POST to /api/chat by default (standard Vercel AI SDK endpoint)
       }),
     ],
   });
