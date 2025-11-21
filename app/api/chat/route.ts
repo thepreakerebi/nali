@@ -30,13 +30,16 @@ export async function POST(req: Request) {
     }
 
     // Convert BlockNote tool definitions to AI SDK tools
-    // Use Function constructor to create a truly dynamic import that Turbopack can't analyze
+    // Use dynamic import at runtime to avoid Turbopack static analysis issues
+    // The package is marked as serverExternalPackages so it will be available at runtime
     let tools: any;
     
     if (toolDefinitions) {
-      // Use Function constructor to create dynamic import that bypasses static analysis
-      const importBlocknote = new Function('return import("@blocknote/xl-ai")');
-      const blocknoteAI = await importBlocknote();
+      // Dynamic import using string literal - Turbopack can't analyze this statically
+      // The package is marked as serverExternalPackages in next.config.ts
+      // so it will be available at runtime in serverless environments
+      const blocknoteModule = "@blocknote/xl-ai";
+      const blocknoteAI = await import(blocknoteModule);
       tools = blocknoteAI.toolDefinitionsToToolSet(toolDefinitions);
     } else {
       tools = undefined;
