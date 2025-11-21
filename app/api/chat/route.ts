@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { convertToModelMessages, streamText } from "ai";
 
 // Allow streaming responses up to 30 seconds
@@ -42,9 +42,13 @@ export async function POST(req: Request) {
       tools = undefined;
     }
 
-    // Stream text using OpenAI with explicit API key
+    // Create OpenAI instance with explicit API key, then get the model
+    const openai = createOpenAI({ apiKey });
+    const model = openai("gpt-4o");
+
+    // Stream text using OpenAI
     const result = streamText({
-      model: openai("gpt-4o", { apiKey }),
+      model,
       messages: convertToModelMessages(messages),
       tools,
       toolChoice: tools ? "required" : "auto",
